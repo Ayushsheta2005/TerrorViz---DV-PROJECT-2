@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Global Terrorism Map</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --dark-red: #8b0000;
+            --blood-red: #660000;
+            --fresh-blood: #bb0a1e;
+            --charcoal: #333;
+            --smoke: rgba(255, 255, 255, 0.9);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: #1a1a1a;
+            color: var(--smoke);
+            font-family: 'Roboto', sans-serif;
+            overflow-x: hidden;
+        }
+
+        /* Blood drip animation */
+        .blood-drip {
+            position: fixed;
+            top: 0;
+            width: 2px;
+            height: 0;
+            background: linear-gradient(var(--fresh-blood), var(--blood-red));
+            animation: drip 3s infinite;
+            opacity: 0.7;
+            z-index: 999;
+        }
+
+        @keyframes drip {
+            0% {
+                height: 0;
+                top: 0;
+            }
+
+            70% {
+                height: 100px;
+                top: 0;
+            }
+
+            100% {
+                height: 0;
+                top: 100px;
+            }
+        }
+
+        .container {
+            max-width: 1800px;
+            /* Increased from 1600px */
+            margin: 0 auto;
+            padding: 20px;
+            position: relative;
+
+        }
+
+        .header-section {
+            text-align: center;
+            margin: 40px 0;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid var(--fresh-blood);
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(187, 10, 30, 0.3);
+        }
+
+        h1 {
+            font-family: 'Cinzel', serif;
+            color: var(--smoke);
+            text-align: center;
+            font-size: 2.5em;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px var(--fresh-blood);
+        }
+
+        .description {
+            color: var(--smoke);
+            font-size: 1.1em;
+            max-width: 800px;
+            margin: 0 auto 30px;
+            line-height: 1.6;
+        }
+
+        .map-container {
+            position: relative;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid var(--fresh-blood);
+            border-radius: 12px;
+            box-shadow: 0 0 30px rgba(187, 10, 30, 0.3);
+            padding: 20px;
+            margin-top: 20px;
+            height: 800px;
+            /* Increased from 700px */
+            overflow: hidden;
+        }
+
+        .time-controls {
+            margin: 20px 0;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid var(--fresh-blood);
+            box-shadow: 0 0 20px rgba(187, 10, 30, 0.2);
+        }
+
+        input[type="range"] {
+            width: 300px;
+            margin: 0 15px;
+            accent-color: var(--fresh-blood);
+        }
+
+        button {
+            background: var(--dark-red);
+            color: var(--smoke);
+            border: 1px solid var(--fresh-blood);
+            padding: 10px 25px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: 'Cinzel', serif;
+            font-weight: 600;
+        }
+
+        button:hover {
+            background: var(--fresh-blood);
+            box-shadow: 0 0 15px var(--fresh-blood);
+            transform: translateY(-2px);
+        }
+
+        .country {
+            fill: #4a2a2a;
+            stroke: var(--fresh-blood);
+            stroke-width: 0.5;
+            transition: all 0.3s ease;
+        }
+
+        .country:hover {
+            stroke: var(--fresh-blood);
+            stroke-width: 2;
+            filter: brightness(1.2);
+        }
+
+        .tooltip {
+            position: fixed;
+            background: rgba(0, 0, 0, 0.95);
+            color: var(--smoke);
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            pointer-events: none;
+            opacity: 0;
+            border: 1px solid var(--fresh-blood);
+            box-shadow: 0 0 20px rgba(187, 10, 30, 0.3);
+            z-index: 1000;
+            max-width: 300px;
+            word-wrap: break-word;
+        }
+
+        .legend-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            /* Change from -220px */
+            background: rgba(0, 0, 0, 0.9);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--fresh-blood);
+            width: 200px;
+            max-width: 100%;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(187, 10, 30, 0.2);
+        }
+
+        .zoom-controls {
+            position: absolute;
+            left: 20px;
+            top: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .zoom-btn {
+            background: rgba(74, 74, 138, 0.9);
+            color: white;
+            border: 1px solid #4a4a8a;
+            border-radius: 4px;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .zoom-btn:hover {
+            background: rgba(90, 90, 154, 0.9);
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 8px 0;
+            color: #e6e6e6;
+            font-size: 0.9em;
+        }
+
+        .legend-color {
+            width: 80px;
+            height: 20px;
+            margin-right: 10px;
+            border: 1px solid #4a4a8a;
+            border-radius: 4px;
+            background: linear-gradient(to right, var(--start-color), var(--end-color));
+        }
+
+        #year-label {
+            color: var(--fresh-blood);
+            font-family: 'Cinzel', serif;
+            font-size: 1.5em;
+            font-weight: 600;
+            margin: 0 10px;
+            text-shadow: 0 0 5px var(--fresh-blood);
+        }
+
+        .analytics-bar {
+            display: flex;
+            justify-content: space-between;
+            margin: 20px 0;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid var(--fresh-blood);
+            border-radius: 12px;
+            box-shadow: 0 0 20px rgba(187, 10, 30, 0.3);
+        }
+
+        .analytics-card {
+            flex: 1;
+            margin: 0 10px;
+            padding: 15px;
+            background: rgba(34, 34, 34, 0.9);
+            border: 1px solid var(--fresh-blood);
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .analytics-card h3 {
+            color: var(--fresh-blood);
+            font-family: 'Cinzel', serif;
+            margin: 0 0 10px 0;
+            font-size: 1.2em;
+        }
+
+        .analytics-content {
+            color: var(--smoke);
+        }
+
+        .country-name, .group-name {
+            font-size: 1.1em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .attack-count, .death-count, .success-rate {
+            font-size: 1.2em;
+            color: var(--fresh-blood);
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Add blood drips -->
+    <div class="blood-drip" style="left: 10%"></div>
+    <div class="blood-drip" style="left: 30%"></div>
+    <div class="blood-drip" style="left: 50%"></div>
+    <div class="blood-drip" style="left: 70%"></div>
+    <div class="blood-drip" style="left: 90%"></div>
+
+    <div class="container">
+        <div class="header-section">
+            <h1>Global Terrorism Map (1970-2020)</h1>
+            <p class="description">
+                This interactive visualization presents a comprehensive view of terrorist activities worldwide through a color-coded map.
+                The intensity of red coloring indicates the number of terrorist attacks in each country for the selected year.
+                Darker shades represent higher numbers of incidents, while lighter shades indicate fewer attacks.
+                Use the timeline slider below to explore how patterns of terrorism have evolved over the past five decades.
+                Hover over any country to view detailed statistics including the number of attacks, casualties, and types of incidents.
+            </p>
+        </div>
+        <div class="time-controls">
+            <input type="range" id="year-slider" min="1970" max="2020" value="2020">
+            <span id="year-label">2020</span>
+            <button id="play-button">Play</button>
+        </div>
+        <div class="map-container">
+            <div class="zoom-controls">
+                <button class="zoom-btn" id="zoom-in">+</button>
+                <button class="zoom-btn" id="zoom-out">-</button>
+                <button class="zoom-btn" id="zoom-reset">↺</button>
+            </div>
+            <div id="map"></div>
+            <div class="tooltip"></div>
+            <div class="legend"></div>
+        </div>
+        <div class="analytics-bar">
+            <div class="analytics-card">
+                <h3>Most Attacked</h3>
+                <div class="analytics-content" id="most-attacked">
+                    <div class="country-name"></div>
+                    <div class="attack-count"></div>
+                </div>
+            </div>
+            <div class="analytics-card">
+                <h3>Most Casualties</h3>
+                <div class="analytics-content" id="most-killed">
+                    <div class="country-name"></div>
+                    <div class="death-count"></div>
+                </div>
+            </div>
+            <div class="analytics-card">
+                <h3>Best Defending</h3>
+                <div class="analytics-content" id="best-defending">
+                    <div class="country-name"></div>
+                    <div class="success-rate"></div>
+                </div>
+            </div>
+            <div class="analytics-card">
+                <h3>Most Active Group</h3>
+                <div class="analytics-content" id="active-group">
+                    <div class="group-name"></div>
+                    <div class="attack-count"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://d3js.org/topojson.v3.min.js"></script>
+    <script>
+        const width = 1600; // Increased from 1200
+        const height = 800; // Increased from 700
+        let currentYear = 2020;
+        let playing = false;
+        let terrorismByCountryYear;
+
+        const svg = d3.select("#map")
+            .append("svg")
+            .attr("viewBox", `0 0 ${width} ${height}`)
+            .attr("preserveAspectRatio", "xMidYMid meet");
+
+        // Add a group for the map that will be transformed
+        const g = svg.append("g");
+
+        // Create zoom behavior
+        const zoom = d3.zoom()
+            .scaleExtent([1, 8])
+            .on("zoom", (event) => {
+                g.attr("transform", event.transform);
+            });
+
+        // Apply zoom behavior to SVG
+        svg.call(zoom);
+
+        // Add zoom control functionality
+        d3.select("#zoom-in").on("click", () => {
+            svg.transition()
+                .duration(750)
+                .call(zoom.scaleBy, 1.5);
+        });
+
+        d3.select("#zoom-out").on("click", () => {
+            svg.transition()
+                .duration(750)
+                .call(zoom.scaleBy, 0.67);
+        });
+
+        d3.select("#zoom-reset").on("click", () => {
+            svg.transition()
+                .duration(750)
+                .call(zoom.transform, d3.zoomIdentity);
+        });
+
+        const projection = d3.geoMercator()
+            .scale(160) // Decreased from 180 to zoom out
+            .translate([width / 2, height / 1.8]); // Adjusted translation to move map down
+
+        const path = d3.geoPath().projection(projection);
+
+        const tooltip = d3.select(".tooltip");
+
+        const attackTypeIcons = {
+            'Bombing/Explosion': '💣',
+            'Armed Assault': '🔫',
+            'Assassination': '🎯',
+            'Hostage Taking': '👥',
+            'Facility/Infrastructure Attack': '🏢'
+        };
+
+        const colorScale = d3.scaleSequential()
+            .interpolator(d => d3.interpolate("#400000", "#ff0000")(d))
+            .domain([0, 100]);
+
+        function findCountryData(countryName, countryCode) {
+            let matchingCountry = null;
+            terrorismByCountryYear.forEach((data, country) => {
+                if (country.toLowerCase() === countryName.toLowerCase() ||
+                    country === countryCode) {
+                    matchingCountry = country;
+                }
+            });
+            return matchingCountry;
+        }
+
+        Promise.all([
+            d3.json('james.geojson'),
+            d3.csv('gtd.csv')
+        ]).then(([worldData, terrorismData]) => {
+            terrorismByCountryYear = new Map();
+
+            terrorismData.forEach(d => {
+                const year = +d.iyear;
+                const country = d.country_txt;
+
+                if (!terrorismByCountryYear.has(country)) {
+                    terrorismByCountryYear.set(country, new Map());
+                }
+                if (!terrorismByCountryYear.get(country).has(year)) {
+                    terrorismByCountryYear.get(country).set(year, []);
+                }
+                terrorismByCountryYear.get(country).get(year).push(d);
+            });
+
+            console.log("Initial data processing complete:", terrorismByCountryYear);
+
+            g.selectAll("path")
+                .data(worldData.features)
+                .enter()
+                .append("path")
+                .attr("d", path)
+                .attr("class", "country")
+                .on("mouseover", handleMouseOver)
+                .on("mouseout", handleMouseOut);
+
+
+            const colorRanges = {
+                q1: {
+                    start: "#fff7cc", // Light yellow
+                    end: "#ffd60a" // Bright yellow
+                },
+                q2: {
+                    start: "#DEBA91", // Light orange
+                    end: "#fb8500" // Bright orange
+                },
+                q3: {
+                    start: "#F3847C", // Light red
+                    end: "#e00000" // Dark red
+                },
+                q4: {
+                    start: "#C33B09", // Light maroon
+                    end: "#882906" // Dark maroon
+                }
+            };
+
+            const attackRanges = [{
+                    min: 0,
+                    max: 0,
+                    startColor: "#FFFFFF", // Pure white
+                    endColor: "#FFFFFF" // Pure white
+                },
+                {
+                    min: 1,
+                    max: 10,
+                    startColor: "#FFFFF0", // Ivory white
+                    endColor: "#FFD700" // Solid gold
+                },
+                {
+                    min: 11,
+                    max: 50,
+                    startColor: "#FFDAB9", // Peach
+                    endColor: "#FF4500" // Orange red
+                },
+                {
+                    min: 51,
+                    max: 100,
+                    startColor: "#FFB6C1", // Light pink
+                    endColor: "#DC143C" // Crimson
+                },
+                {
+                    min: 101,
+                    max: 500,
+                    startColor: "#CD5C5C", // Indian red
+                    endColor: "#8B0000" // Dark red
+                },
+                {
+                    min: 501,
+                    max: Infinity,
+                    startColor: "#A30000", // Lighter pink-red
+                    endColor: "#330000" // Very dark red
+                }
+            ];
+
+
+            function interpolateColor(startColor, endColor, factor) {
+                // Convert hex to RGB
+                const start = {
+                    r: parseInt(startColor.slice(1, 3), 16),
+                    g: parseInt(startColor.slice(3, 5), 16),
+                    b: parseInt(startColor.slice(5, 7), 16)
+                };
+
+                const end = {
+                    r: parseInt(endColor.slice(1, 3), 16),
+                    g: parseInt(endColor.slice(3, 5), 16),
+                    b: parseInt(endColor.slice(5, 7), 16)
+                };
+
+                // Interpolate with enhanced contrast
+                const r = Math.round(start.r + (end.r - start.r) * Math.pow(factor, 0.8));
+                const g = Math.round(start.g + (end.g - start.g) * Math.pow(factor, 0.8));
+                const b = Math.round(start.b + (end.b - start.b) * Math.pow(factor, 0.8));
+
+                // Convert back to hex
+                return `#${(r << 16 | g << 8 | b).toString(16).padStart(6, '0')}`;
+            }
+
+            function getColorForValue(value) {
+                if (value === 0) return attackRanges[0].startColor;
+
+                for (const range of attackRanges) {
+                    if (value >= range.min && value <= range.max) {
+                        // Calculate position within the range for gradient
+                        const rangeSize = range.max === Infinity ?
+                            Math.min(value - range.min, 1000) : // Cap the infinity range
+                            range.max - range.min;
+                        const position = (value - range.min) / rangeSize;
+                        // Enhance contrast by adjusting the factor curve
+                        const factor = Math.pow(Math.min(Math.max(position, 0), 1), 0.7);
+                        return interpolateColor(range.startColor, range.endColor, factor);
+                    }
+                }
+                return attackRanges[0].startColor; // Default color for no data
+            }
+
+            function calculateQuartilesAndRanges(attackCounts) {
+                const values = Array.from(attackCounts.values()).filter(v => v > 0);
+                values.sort((a, b) => a - b);
+
+                if (values.length === 0) return {
+                    quartiles: [0, 0, 0],
+                    ranges: null
+                };
+
+                // Ensure we handle the case where there's only one value
+                if (values.length === 1) {
+                    return {
+                        quartiles: [values[0], values[0], values[0]],
+                        ranges: {
+                            q1: {
+                                min: 1,
+                                max: values[0]
+                            },
+                            q2: {
+                                min: values[0],
+                                max: values[0]
+                            },
+                            q3: {
+                                min: values[0],
+                                max: values[0]
+                            },
+                            q4: {
+                                min: values[0],
+                                max: values[0]
+                            }
+                        }
+                    };
+                }
+
+                // Calculate quartile indices
+                const q1Index = Math.max(0, Math.floor(values.length * 0.25));
+                const q2Index = Math.max(0, Math.floor(values.length * 0.5));
+                const q3Index = Math.max(0, Math.floor(values.length * 0.75));
+
+                const quartiles = [
+                    values[q1Index],
+                    values[q2Index],
+                    values[q3Index]
+                ];
+
+                // Ensure ranges don't overlap and handle single-value cases
+                const ranges = {
+                    q1: {
+                        min: 1, // Always start from 1 for the first quartile
+                        max: quartiles[0]
+                    },
+                    q2: {
+                        min: quartiles[0] + 1,
+                        max: quartiles[1]
+                    },
+                    q3: {
+                        min: quartiles[1] + 1,
+                        max: quartiles[2]
+                    },
+                    q4: {
+                        min: quartiles[2] + 1,
+                        max: values[values.length - 1]
+                    }
+                };
+
+                // Handle cases where quartiles are equal
+                if (quartiles[0] === quartiles[1]) {
+                    ranges.q2.min = ranges.q2.max = quartiles[0];
+                }
+                if (quartiles[1] === quartiles[2]) {
+                    ranges.q3.min = ranges.q3.max = quartiles[1];
+                }
+
+                return {
+                    quartiles,
+                    ranges
+                };
+            }
+
+            function updateMap(year) {
+                const attackCounts = new Map();
+
+                terrorismByCountryYear.forEach((yearData, country) => {
+                    const yearAttacks = yearData.get(year) || [];
+                    attackCounts.set(country, yearAttacks.length);
+                });
+
+                // Update map colors with enhanced transition
+                svg.selectAll(".country")
+                    .transition()
+                    .duration(200)
+                    .style("fill", d => {
+                        const matchingCountry = findCountryData(d.properties.name, d.id);
+                        if (matchingCountry) {
+                            const attackCount = attackCounts.get(matchingCountry) || 0;
+                            return getColorForValue(attackCount);
+                        }
+                        return attackRanges[0].startColor;
+                    });
+
+                // Update legend
+                updateLegend();
+                updateAnalytics(year); // Add this line at the end
+            }
+
+            function updateLegend() {
+                const legendContainer = d3.select(".legend-container");
+
+                if (legendContainer.empty()) {
+                    const container = d3.select(".map-container")
+                        .append("div")
+                        .attr("class", "legend-container");
+
+                    const items = attackRanges.map(range => ({
+                        startColor: range.startColor,
+                        endColor: range.endColor,
+                        label: range.max === 0 ?
+                            "No attacks" :
+                            range.max === Infinity ?
+                            "500+ attacks" :
+                            `${range.min}-${range.max} attacks`
+                    }));
+
+                    items.forEach(item => {
+                        const div = container.append("div")
+                            .attr("class", "legend-item");
+
+                        div.append("div")
+                            .attr("class", "legend-color")
+                            .style("background", `linear-gradient(to right, ${item.startColor}, ${item.endColor})`);
+
+                        div.append("span")
+                            .text(item.label);
+                    });
+                }
+            }
+            const style = document.createElement('style');
+            style.textContent = `
+    .legend-container {
+        background: #1a1a1a;
+        padding: 10px;
+        border-radius: 4px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        border: 1px solid #333;
+        margin: 10px;
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+        height: 170px;
+    }
+    .legend-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 6px;
+        font-size: 12px;
+        font-weight: 400;
+        color: #ffffff;
+    }
+    .legend-color {
+        width: 60px;
+        height: 15px;
+        margin-right: 10px;
+        border-radius: 2px;
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+    .legend-item span {
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+    }
+    .legend-item:last-child {
+        margin-bottom: 0;
+    }
+`;
+            document.head.appendChild(style);
+
+            function handleMouseOver(event, d) {
+                const matchingCountry = findCountryData(
+                    d.properties.name,
+                    d.properties.iso_a3
+                );
+
+                let countryData = [];
+                if (matchingCountry) {
+                    const yearMap = terrorismByCountryYear.get(matchingCountry);
+                    countryData = yearMap ?.get(currentYear) || [];
+                }
+
+                let totalKilled = 0;
+                let totalWounded = 0;
+                countryData.forEach(attack => {
+                    totalKilled += +(attack.nkill || 0);
+                    totalWounded += +(attack.nwound || 0);
+                });
+
+                const tooltipContent = `
+                <strong>${d.properties.name}</strong><br>
+                <span style="color: #ff4444">Year: ${currentYear}</span><br>
+                <span style="color: #ff6666">Total Attacks: ${countryData.length}</span><br>
+                <span style="color: #ff8888">Casualties:</span><br>
+                - Killed: ${totalKilled}<br>
+                - Wounded: ${totalWounded}<br>
+                <br>
+                <span style="color: #ffaaaa">Attack Types:</span><br>
+                ${getAttackBreakdown(countryData)}
+            `;
+
+                // Get viewport dimensions
+                const viewportWidth = window.innerWidth;
+                const viewportHeight = window.innerHeight;
+
+                const tooltipWidth = 300;
+                const tooltipHeight = 200;
+
+                let left = event.clientX + 20;
+                let top = event.clientY + 20;
+
+                // Prevent overflow beyond the right edge
+                if (left + tooltipWidth > viewportWidth) {
+                    left = event.clientX - tooltipWidth - 20;
+                }
+
+                // Prevent overflow beyond the bottom edge
+                if (top + tooltipHeight > viewportHeight) {
+                    top = event.clientY - tooltipHeight - 20;
+                }
+
+                // Ensure tooltip never goes off-screen
+                // left = Math.max(10, Math.min(left, viewportWidth - tooltipWidth - 10));
+                // top = Math.max(10, Math.min(top, viewportHeight - tooltipHeight - 10));
+
+                tooltip.style("opacity", 1)
+                    .html(tooltipContent)
+                    .style("left", `${Math.max(10, left)}px`)
+                    .style("top", `${Math.max(10, top)}px`);
+            }
+
+            function handleMouseOut() {
+                tooltip.style("opacity", 0);
+            }
+
+            // Helper function to get attack breakdown
+            function getAttackBreakdown(attacks) {
+                if (!attacks || attacks.length === 0) return "No attacks";
+
+                const breakdown = d3.group(attacks, d => d.attacktype1_txt);
+                let html = "";
+                breakdown.forEach((value, key) => {
+                    html += `${attackTypeIcons[key] || '•'} ${key}: ${value.length}<br>`;
+                });
+                return html;
+            }
+
+            // Update attack markers
+            function updateAttackMarkers(year, data) {
+                const yearData = data.filter(d => +d.iyear === year);
+
+                svg.selectAll(".attack-marker").remove();
+
+                svg.selectAll(".attack-marker")
+                    .data(yearData)
+                    .enter()
+                    .append("text")
+                    .attr("class", "attack-marker")
+                    .text(d => attackTypeIcons[d.attacktype1_txt] || '•')
+                    .attr("x", d => projection([+d.longitude, +d.latitude])[0])
+                    .attr("y", d => projection([+d.longitude, +d.latitude])[1])
+                    .attr("font-size", "8px")
+                    .style("opacity", 0.7);
+            }
+
+            // Time controls setup
+            const slider = document.getElementById("year-slider");
+            const yearLabel = document.getElementById("year-label");
+            const playButton = document.getElementById("play-button");
+
+            // Add this line to initialize the map with 2020 data
+            updateMap(2020);
+
+            slider.addEventListener("input", function () {
+                currentYear = +this.value;
+                yearLabel.textContent = currentYear;
+                updateMap(currentYear);
+            });
+
+            playButton.addEventListener("click", function () {
+                playing = !playing;
+                this.textContent = playing ? "Pause" : "Play";
+                if (playing) {
+                    playTimeline();
+                }
+            });
+
+            function playTimeline() {
+                if (!playing) return;
+
+                if (currentYear < 2020) {
+                    currentYear++;
+                    slider.value = currentYear;
+                    yearLabel.textContent = currentYear;
+                    updateMap(currentYear);
+                    setTimeout(playTimeline, 1000);
+                } else {
+                    playing = false;
+                    playButton.textContent = "Play";
+                    currentYear = 1970; // Reset to start
+                    slider.value = currentYear;
+                    yearLabel.textContent = currentYear;
+                    updateMap(currentYear);
+                }
+            }
+
+            function updateAnalytics(year) {
+                const yearData = [];
+                terrorismByCountryYear.forEach((yearMap, country) => {
+                    const attacks = yearMap.get(year) || [];
+                    if (attacks.length > 0) {
+                        yearData.push({
+                            country: country,
+                            attacks: attacks,
+                            attackCount: attacks.length,
+                            casualties: attacks.reduce((sum, attack) => sum + (Number(attack.nkill) || 0), 0),
+                            successRate: attacks.filter(attack => attack.success === "0").length / attacks.length,
+                        });
+                    }
+                });
+
+                // Calculate group activity
+                const groupActivity = new Map();
+                yearData.forEach(countryData => {
+                    countryData.attacks.forEach(attack => {
+                        if (attack.gname && attack.gname !== "Unknown") {
+                            groupActivity.set(attack.gname, 
+                                (groupActivity.get(attack.gname) || 0) + 1);
+                        }
+                    });
+                });
+
+                // Most attacked country
+                const mostAttacked = yearData.reduce((prev, curr) => 
+                    prev.attackCount > curr.attackCount ? prev : curr, 
+                    { country: "None", attackCount: 0 });
+
+                // Most casualties
+                const mostKilled = yearData.reduce((prev, curr) => 
+                    prev.casualties > curr.casualties ? prev : curr, 
+                    { country: "None", casualties: 0 });
+
+                // Best defending (lowest success rate with minimum 5 attacks)
+                const bestDefending = yearData
+                    .filter(d => d.attacks.length >= 5)
+                    .reduce((prev, curr) => 
+                        prev.successRate < curr.successRate ? prev : curr, 
+                        { country: "None", successRate: 1 });
+
+                // Most active group
+                const mostActiveGroup = Array.from(groupActivity.entries())
+                    .reduce((prev, curr) => 
+                        prev[1] > curr[1] ? prev : curr, 
+                        ["None", 0]);
+
+                // Update DOM
+                document.querySelector("#most-attacked .country-name").textContent = mostAttacked.country;
+                document.querySelector("#most-attacked .attack-count").textContent = 
+                    `${mostAttacked.attackCount} attacks`;
+
+                document.querySelector("#most-killed .country-name").textContent = mostKilled.country;
+                document.querySelector("#most-killed .death-count").textContent = 
+                    `${mostKilled.casualties} casualties`;
+
+                document.querySelector("#best-defending .country-name").textContent = bestDefending.country;
+                document.querySelector("#best-defending .success-rate").textContent = 
+                    `${Math.round((1 - bestDefending.successRate) * 100)}% prevented`;
+
+                document.querySelector("#active-group .group-name").textContent = mostActiveGroup[0];
+                document.querySelector("#active-group .attack-count").textContent = 
+                    `${mostActiveGroup[1]} attacks`;
+            }
+        });
+    </script>
+</body>
+
+</html>

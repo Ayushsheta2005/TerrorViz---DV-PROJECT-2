@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Global Terrorism Impact Analysis</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="3styles.css" rel="stylesheet">
+</head>
+
+<body>
+    <!-- Blood drips -->
+    <div class="blood-drip" style="left: 10%"></div>
+    <div class="blood-drip" style="left: 30%"></div>
+    <div class="blood-drip" style="left: 50%"></div>
+    <div class="blood-drip" style="left: 70%"></div>
+    <div class="blood-drip" style="left: 90%"></div>
+
+    <div class="dashboard">
+        <h1>Global Terrorism Impact Analysis (1970-2023)</h1>
+
+        <div class="filters">
+            <div class="filter-group">
+                <label>Year Range</label>
+                <select id="yearRange">
+                    <option value="all">All Years</option>
+                    <option value="1970-1980">1970-1980</option>
+                    <option value="1981-1990">1981-1990</option>
+                    <option value="1991-2000">1991-2000</option>
+                    <option value="2001-2010">2001-2010</option>
+                    <option value="2011-2023">2011-2023</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Region</label>
+                <select id="region">
+                    <option value="all">All Regions</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Attack Type</label>
+                <select id="attackType">
+                    <option value="all">All Types</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Weapon Type</label>
+                <select id="weaponType">
+                    <option value="all">All Weapons</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-label">Total Incidents</div>
+                <div class="metric-value" id="totalIncidents">-</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Total Casualties</div>
+                <div class="metric-value" id="totalCasualties">-</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Total Wounded</div>
+                <div class="metric-value" id="totalWounded">-</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Impact Score</div>
+                <div class="metric-value" id="impactScore">-</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Success Rate</div>
+                <div class="metric-value" id="successRate">-</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Avg. Impact Per Attack</div>
+                <div class="metric-value" id="avgImpact">-</div>
+            </div>
+        </div>
+
+        <div class="chart-container full-width" id="paretoChart"></div>
+
+        <div class="charts-grid">
+            <div class="chart-container" id="impactScoreChart"></div>
+            <div class="chart-container" id="trendChart"></div>
+        </div>
+
+        <div class="impact-legend">
+            <h3>Impact Score Calculation</h3>
+            <p>The Impact Score is a composite metric that considers multiple factors:</p>
+            <div class="impact-formula">
+                Impact Score = (Casualties × 1.0) + (Wounded × 0.5) + (Success Rate × 100) + (Frequency Factor × 10)
+            </div>
+            <p>Where:</p>
+            <ul>
+                <li>Casualties are weighted at 100%</li>
+                <li>Wounded are weighted at 50%</li>
+                <li>Success Rate is normalized to 0-100 scale</li>
+                <li>Frequency Factor is normalized incident count (0-1)</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        const tooltip = d3.select("body").append("div")
+            .attr("class", "tooltip")
+            .style("opacity", 0);
+
+        // Load data
+        d3.csv('gtd.csv').then(data => {
+            // Clean and transform data
+            const cleanData = data.map(d => ({
+                year: +d.iyear,
+                month: +d.imonth,
+                region: d.region_txt,
+                country: d.country_txt,
+                city: d.city,
+                attackType: d.attacktype1_txt,
+                weaponType: d.weaptype1_txt,
+                kills: +d.nkill || 0,
+                wounded: +d.nwound || 0,
+                success: d.success === "1",
+                target: d.targtype1_txt
+            })).filter(d => d.attackType && d.weaponType); // Remove entries with undefined types
+
+            initializeDashboard(cleanData);
+        });
+
+        function processData(data) {
+            // Group data by attack type
+            const attackTypeStats = d3.group(data, d => d.attackType);
+            const stats = {
+                byAttackType: {},
+                byYear: {},
+                total: {
+                    incidents: 0,
+                    kills: 0,
+                    wounded: 0,
+                    successful: 0
+                }
+            };
+
+            // Process attack type statistics
+            for (let [type, group] of attackTypeStats) {
+                stats.byAttackType[type] = {
+                    incidents: group.length,
+                    kills: d3.sum(group, d => d.kills),
+                    wounded: d3.sum(group, d => d.wounded),
+                    successful: d3.sum(group, d => d.success ? 1 : 0)
+                };
+                stats.total.incidents += group.length;
+                stats.total.successful += d3.sum(group, d => d.success === "1" ? 1 : 0);
+
+            }
+
+            // Process yearly statistics
+            const yearStats = d3.group(data, d => d.year);
+            for (let [year, group] of yearStats) {
+                stats.byYear[year] = {
+                    incidents: group.length,
+                    kills: d3.sum(group, d => d.kills),
+                    wounded: d3.sum(group, d => d.wounded)
+                };
+            }
+
+            // Calculate totals
+            stats.total.incidents = data.length;
+            stats.total.kills = d3.sum(data, d => d.kills);
+            stats.total.wounded = d3.sum(data, d => d.wounded);
+            stats.total.successful = d3.sum(data, d => d.success ? 1 : 0);
+
+            return stats;
+        }
+
+        function createParetoChart(stats) {
+            const margin = { top: 40, right: 60, bottom: 120, left: 60 };
+            const width = document.querySelector('#paretoChart').clientWidth - margin.left - margin.right;
+            const height = 400 - margin.top - margin.bottom;
+
+            d3.select('#paretoChart').html('');
+
+            const svg = d3.select('#paretoChart')
+                .append('svg')
+                .attr('width', width + margin.left + margin.right)
+                .attr('height', height + margin.top + margin.bottom)
+                .append('g')
+                .attr('transform', `translate(${margin.left},${margin.top})`);
+
+            // Convert stats object to array and sort by total impact
+            const data = Object.entries(stats.byAttackType)
+                .map(([type, values]) => ({
+                    type,
+                    kills: values.kills,
+                    wounded: values.wounded,
+                    total: values.kills + values.wounded
+                }))
+                .sort((a, b) => b.total - a.total)
+                .slice(0, 10); // Show top 10 attack types
+
+            // Calculate cumulative percentages
+            const total = d3.sum(data, d => d.total);
+            let cumulative = 0;
+            data.forEach(d => {
+                cumulative += d.total;
+                d.cumulative = (cumulative / total) * 100;
+            });
+
+            // Scales
+            const x = d3.scaleBand()
+                .range([0, width])
+                .domain(data.map(d => d.type))
+                .padding(0.2);
+
+            const y1 = d3.scaleLinear()
+                .range([height, 0])
+                .domain([0, d3.max(data, d => d.total)]);
+
+            const y2 = d3.scaleLinear()
+                .range([height, 0])
+                .domain([0, 100]);
+            // Draw bars for kills
+            svg.selectAll('.bar-kills')
+                .data(data)
+                .enter()
+                .append('rect')
+                .attr('class', 'bar-kills')
+                .attr('x', d => x(d.type))
+                .attr('y', d => y1(d.kills))
+                .attr('width', x.bandwidth() / 2) // Half width for side by side
+                .attr('height', d => height - y1(d.kills))
+                .attr('fill', 'rgba(180, 0, 0, 0.6)');
+
+            // Draw bars for wounded
+            svg.selectAll('.bar-wounded')
+                .data(data)
+                .enter()
+                .append('rect')
+                .attr('class', 'bar-wounded')
+                .attr('x', d => x(d.type) + x.bandwidth() / 2) // Offset by half bandwidth
+                .attr('y', d => y1(d.wounded))
+                .attr('width', x.bandwidth() / 2)
+                .attr('height', d => height - y1(d.wounded))
+                .attr('fill', 'rgba(255, 255, 0, 0.6)'); // Yellow color
+
+            // Draw line
+            const line = d3.line()
+                .x(d => x(d.type) + x.bandwidth() / 2)
+                .y(d => y2(d.cumulative));
+
+            svg.append('path')
+                .datum(data)
+                .attr('class', 'line')
+                .attr('d', line)
+                .style('stroke', 'white')
+                .style('stroke-width', 2)
+                .style('fill', 'none');
+
+            // Add axes
+            svg.append('g')
+                .attr('class', 'axis')
+                .attr('transform', `translate(0,${height})`)
+                .call(d3.axisBottom(x))
+                .selectAll('text')
+                .style('text-anchor', 'end')
+                .attr('transform', 'rotate(-45)')
+                .attr('dx', '-.8em')
+                .attr('dy', '.15em');
+
+            svg.append('g')
+                .attr('class', 'axis')
+                .call(d3.axisLeft(y1));
+
+            svg.append('g')
+                .attr('class', 'axis')
+                .attr('transform', `translate(${width},0)`)
+                .call(d3.axisRight(y2));
+
+            // Add legend
+            const legend = svg.append('g')
+                .attr('class', 'legend')
+                .attr('transform', `translate(${width - 100}, -30)`);
+
+            legend.append('rect')
+                .attr('x', 0)
+                .attr('width', 15)
+                .attr('height', 15)
+                .attr('fill', 'rgba(180, 0, 0, 0.6)');
+
+            legend.append('rect')
+                .attr('x', 60)
+                .attr('width', 15)
+                .attr('height', 15)
+                .attr('fill', 'rgba(255, 255, 0, 0.6)');
+
+            legend.append('text')
+                .attr('x', 20)
+                .attr('y', 12)
+                .text('Kills')
+                .style('fill', 'white')
+                .style('font-size', '12px');
+
+            legend.append('text')
+                .attr('x', 80)
+                .attr('y', 12)
+                .text('Wounded')
+                .style('fill', 'white')
+                .style('font-size', '12px');
+
+            // Add title
+            svg.append('text')
+                .attr('x', width / 2)
+                .attr('y', -10)
+                .attr('text-anchor', 'middle')
+                .style('fill', 'white')
+                .text('Impact Distribution by Attack Type (Top 10)');
+
+            // Add hover effects
+            const handleMouseOver = function (event, d) {
+                d3.selectAll('.bar-kills, .bar-wounded').attr('opacity', 0.3);
+                d3.select(this).attr('opacity', 1);
+                tooltip.transition()
+                    .duration(200)
+                    .style('opacity', .9);
+                tooltip.html(`
+                <strong>${d.type}</strong><br/>
+                Kills: ${d.kills.toLocaleString()}<br/>
+                Wounded: ${d.wounded.toLocaleString()}<br/>
+                Cumulative %: ${d.cumulative.toFixed(1)}%
+                `)
+                    .style('left', (event.pageX + 10) + 'px')
+                    .style('top', (event.pageY - 28) + 'px');
+            };
+
+            const handleMouseOut = function () {
+                d3.selectAll('.bar-kills, .bar-wounded').attr('opacity', 1);
+                tooltip.transition()
+                    .duration(500)
+                    .style('opacity', 0);
+            };
+
+            svg.selectAll('.bar-kills, .bar-wounded')
+                .on('mouseover', handleMouseOver)
+                .on('mouseout', handleMouseOut);
+        }
+
+        function createTimelineChart(stats) {
+            const margin = { top: 40, right: 60, bottom: 60, left: 60 };
+            const width = document.querySelector('#impactScoreChart').clientWidth - margin.left - margin.right;
+            const height = 300 - margin.top - margin.bottom;
+
+            d3.select('#impactScoreChart').html('');
+
+            const svg = d3.select('#impactScoreChart')
+                .append('svg')
+                .attr('width', width + margin.left + margin.right)
+                .attr('height', height + margin.top + margin.bottom)
+                .append('g')
+                .attr('transform', `translate(${margin.left},${margin.top})`);
+
+            // Prepare data
+            const data = Object.entries(stats.byYear)
+                .map(([year, values]) => ({
+                    year: +year,
+                    incidents: values.incidents,
+                    impact: values.kills + values.wounded
+                }))
+                .sort((a, b) => a.year - b.year);
+
+            // Scales
+            const x = d3.scaleLinear()
+                .domain(d3.extent(data, d => d.year))
+                .range([0, width]);
+
+            const y = d3.scaleLinear()
+                .domain([0, d3.max(data, d => d.impact)])
+                .range([height, 0]);
+
+            // Add line
+            const line = d3.line()
+                .x(d => x(d.year))
+                .y(d => y(d.impact));
+
+            svg.append('path')
+                .datum(data)
+                .attr('class', 'line')
+                .attr('d', line)
+                .style('stroke', 'rgba(180, 0, 0, 0.8)')
+                .style('stroke-width', 2)
+                .style('fill', 'none');
+
+            // Add axes
+            svg.append('g')
+                .attr('class', 'axis')
+                .attr('transform', `translate(0,${height})`)
+                .call(d3.axisBottom(x).tickFormat(d3.format('d')));
+
+            svg.append('g')
+                .attr('class', 'axis')
+                .call(d3.axisLeft(y));
+
+            // Add title
+            svg.append('text')
+                .attr('x', width / 2)
+                .attr('y', -10)
+                .attr('text-anchor', 'middle')
+                .style('fill', 'white')
+                .text('Total Impact Over Time');
+        }
+
+        function updateMetricsPanel(stats) {
+            const successRate = (stats.total.successful / stats.total.incidents * 100).toFixed(1);
+            const avgImpact = ((stats.total.kills + stats.total.wounded) / stats.total.incidents).toFixed(2);
+            const impactScore = (
+                stats.total.kills +
+                stats.total.wounded * 0.5 +
+                stats.total.successful / stats.total.incidents * 100
+            ).toFixed(0);
+
+            document.getElementById('totalIncidents').textContent = stats.total.incidents.toLocaleString();
+            document.getElementById('totalCasualties').textContent = stats.total.kills.toLocaleString();
+            document.getElementById('totalWounded').textContent = stats.total.wounded.toLocaleString();
+            document.getElementById('impactScore').textContent = impactScore;
+            document.getElementById('successRate').textContent = successRate + '%';
+            document.getElementById('avgImpact').textContent = avgImpact;
+        }
+
+        function initializeDashboard(data) {
+            const stats = processData(data);
+            updateMetricsPanel(stats);
+            createParetoChart(stats);
+            createTimelineChart(stats);
+            createSuccessRateChart(stats);
+
+            // Initialize filters
+            const regions = [...new Set(data.map(d => d.region))].filter(Boolean).sort();
+            const attackTypes = [...new Set(data.map(d => d.attackType))].filter(Boolean).sort();
+            const weaponTypes = [...new Set(data.map(d => d.weaponType))].filter(Boolean).sort();
+
+            // Populate dropdowns
+            populateSelect('region', regions);
+            populateSelect('attackType', attackTypes);
+            populateSelect('weaponType', weaponTypes);
+
+            // Add filter event listeners
+            d3.selectAll('.filters select').on('change', function () {
+                const filteredData = filterData(data);
+                const newStats = processData(filteredData);
+                updateMetricsPanel(newStats);
+                createParetoChart(newStats);
+                createTimelineChart(newStats);
+                createSuccessRateChart(newStats);
+            });
+        }
+
+        function populateSelect(id, options) {
+            const select = document.getElementById(id);
+            select.innerHTML = '<option value="all">All</option>';
+            options.forEach(option => {
+                const opt = document.createElement('option');
+                opt.value = option;
+                opt.textContent = option;
+                select.appendChild(opt);
+            });
+        }
+
+        function filterData(data) {
+            const yearRange = document.getElementById('yearRange').value;
+            const region = document.getElementById('region').value;
+            const attackType = document.getElementById('attackType').value;
+            const weaponType = document.getElementById('weaponType').value;
+
+            return data.filter(d => {
+                if (yearRange !== 'all') {
+                    const [start, end] = yearRange.split('-').map(Number);
+                    if (d.year < start || d.year > end) return false;
+                }
+                if (region !== 'all' && d.region !== region) return false;
+                if (attackType !== 'all' && d.attackType !== attackType) return false;
+                if (weaponType !== 'all' && d.weaponType !== weaponType) return false;
+                return true;
+            });
+        }
+
+        function createSuccessRateChart(stats) {
+            const margin = { top: 20, right: 20, bottom: 80, left: 40 };
+            const containerWidth = document.querySelector('#trendChart').clientWidth;
+            const containerHeight = document.querySelector('#trendChart').clientHeight || 300;
+            const width = containerWidth - margin.left - margin.right;
+            const height = Math.min(containerHeight - margin.top - margin.bottom, 200);
+
+            // Clear existing chart
+            d3.select('#trendChart').html('');
+
+            const svg = d3.select('#trendChart')
+                .append('svg')
+                .attr('width', '100%')
+                .attr('height', '100%')
+                .attr('viewBox', `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`)
+                .append('g')
+                .attr('transform', `translate(${margin.left},${margin.top})`);
+
+            // Prepare data
+            const data = Object.entries(stats.byAttackType)
+                .map(([type, values]) => ({
+                    type: type,
+                    successRate: (values.successful / values.incidents * 100)
+                }))
+                .sort((a, b) => b.successRate - a.successRate);
+
+            // Scales
+            const x = d3.scaleBand()
+                .range([0, width])
+                .domain(data.map(d => d.type))
+                .padding(0.2);
+
+            const y = d3.scaleLinear()
+                .range([height, 0])
+                .domain([0, 100]);
+
+            // Draw bars
+            svg.selectAll('.bar')
+                .data(data)
+                .enter()
+                .append('rect')
+                .attr('class', 'bar')
+                .attr('x', d => x(d.type))
+                .attr('y', d => y(d.successRate))
+                .attr('width', x.bandwidth())
+                .attr('height', d => height - y(d.successRate))
+                .attr('fill', 'rgba(180, 0, 0, 0.7)')
+                .on('mouseover', function (event, d) {
+                    tooltip.transition()
+                        .duration(200)
+                        .style('opacity', .9);
+                    tooltip.html(`
+                <strong>${d.type}</strong><br/>
+                Success Rate: ${d.successRate.toFixed(1)}%
+            `)
+                        .style('left', (event.pageX + 10) + 'px')
+                        .style('top', (event.pageY - 28) + 'px');
+                })
+                .on('mouseout', function () {
+                    tooltip.transition()
+                        .duration(500)
+                        .style('opacity', 0);
+                });
+
+            // Add axes
+            svg.append('g')
+                .attr('class', 'axis')
+                .attr('transform', `translate(0,${height})`)
+                .call(d3.axisBottom(x))
+                .selectAll('text')
+                .style('text-anchor', 'end')
+                .attr('transform', 'rotate(-45)')
+                .attr('dx', '-.8em')
+                .attr('dy', '.15em')
+                .style('fill', 'white');
+
+            svg.append('g')
+                .attr('class', 'axis')
+                .call(d3.axisLeft(y).tickFormat(d => d + '%'))
+                .selectAll('text')
+                .style('fill', 'white');
+
+            // Add title
+            svg.append('text')
+                .attr('x', width / 2)
+                .attr('y', -5)
+                .attr('text-anchor', 'middle')
+                .style('fill', 'white')
+                .style('font-size', '12px')
+                .text('Success Rate by Attack Type');
+
+            svg.selectAll('.axis text')
+                .style('font-size', '10px');
+
+            // Add grid lines
+            svg.append('g')
+                .attr('class', 'grid')
+                .call(d3.axisLeft(y)
+                    .tickSize(-width)
+                    .tickFormat('')
+                )
+                .style('stroke', 'rgba(255, 255, 255, 0.1)')
+                .style('stroke-dasharray', '2,2');
+        }
+    </script>
+</body>
+
+</html>

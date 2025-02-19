@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Terrorism Database Visualization</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Roboto:wght@300;400;700&display=swap');
+
+        :root {
+            --dark-red: #8b0000;
+            --blood-red: #660000;
+            --fresh-blood: #bb0a1e;
+            --charcoal: #333;
+            --smoke: rgba(255, 255, 255, 0.9);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #1a1a1a;
+            color: var(--smoke);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Blood drip animation */
+        .blood-drip {
+            position: fixed;
+            top: 0;
+            width: 2px;
+            height: 0;
+            background: linear-gradient(var(--fresh-blood), var(--blood-red));
+            animation: drip 3s infinite;
+            opacity: 0.7;
+            z-index: 999;
+        }
+
+        @keyframes drip {
+            0% {
+                height: 0;
+                top: 0;
+            }
+            70% {
+                height: 100px;
+                top: 0;
+            }
+            100% {
+                height: 0;
+                top: 100px;
+            }
+        }
+
+        /* Blood splatter effect */
+        .blood-splatter {
+            position: fixed;
+            pointer-events: none;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at var(--x) var(--y), transparent 0%, rgba(187, 10, 30, 0.1) 30%, transparent 70%);
+            opacity: 0;
+            transition: opacity 0.5s;
+            z-index: 998;
+        }
+
+        .navbar {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 1rem 0;
+            z-index: 1000;
+            border-bottom: 2px solid var(--fresh-blood);
+            box-shadow: 0 0 10px var(--fresh-blood);
+        }
+
+        .nav-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 2rem;
+        }
+
+        .logo {
+            font-family: 'Cinzel', serif;
+            font-size: 1.5rem;
+            color: var(--smoke);
+            text-decoration: none;
+            text-shadow: 0 0 5px var(--fresh-blood);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .nav-links a {
+            color: var(--smoke);
+            text-decoration: none;
+            transition: color 0.3s;
+            font-size: 1.1rem;
+            position: relative;
+        }
+
+        .nav-links a::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: var(--fresh-blood);
+            transform: scaleX(0);
+            transition: transform 0.3s;
+        }
+
+        .nav-links a:hover::after {
+            transform: scaleX(1);
+        }
+
+        .slideshow {
+            height: 100vh;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .slide {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            transition: opacity 1s ease-in-out;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            background-size: cover;
+            background-position: center;
+            background-blend-mode: darken;
+        }
+
+        .slide.active {
+            opacity: 1;
+        }
+
+        .slide-content {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 2rem;
+            border-radius: 10px;
+            max-width: 800px;
+            margin: 0 1rem;
+            border: 1px solid var(--fresh-blood);
+            box-shadow: 0 0 20px rgba(187, 10, 30, 0.3);
+        }
+
+        .slide h2 {
+            font-family: 'Cinzel', serif;
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            color: var(--smoke);
+            text-shadow: 0 0 10px var(--fresh-blood);
+        }
+
+        .visualizations {
+            max-width: 1200px;
+            margin: 4rem auto;
+            padding: 0 2rem;
+            position: relative;
+        }
+
+        .vis-card {
+            background: rgba(0, 0, 0, 0.8);
+            margin: 2rem 0;
+            padding: 2rem;
+            border-radius: 10px;
+            border: 1px solid var(--fresh-blood);
+            transform: translateY(50px);
+            opacity: 0;
+            transition: all 0.6s ease-out;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .vis-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(45deg, transparent, rgba(187, 10, 30, 0.1), transparent);
+            transform: translateX(-100%);
+            transition: transform 0.6s;
+        }
+
+        .vis-card:hover::before {
+            transform: translateX(100%);
+        }
+
+        .vis-card.visible {
+            transform: translateY(0);
+            opacity: 1;
+            box-shadow: 0 0 20px rgba(187, 10, 30, 0.2);
+        }
+
+        .vis-card h3 {
+            font-family: 'Cinzel', serif;
+            font-size: 1.8rem;
+            margin-bottom: 1rem;
+            color: var(--smoke);
+            text-shadow: 0 0 5px var(--fresh-blood);
+        }
+
+        .vis-link {
+            display: inline-block;
+            padding: 0.8rem 1.5rem;
+            background: var(--dark-red);
+            color: var(--smoke);
+            text-decoration: none;
+            border-radius: 5px;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .vis-link:hover {
+            background: var(--fresh-blood);
+            box-shadow: 0 0 15px var(--fresh-blood);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* Blood cursor trail */
+        .blood-drop {
+            position: fixed;
+            pointer-events: none;
+            background: radial-gradient(circle, var(--fresh-blood) 0%, transparent 100%);
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            opacity: 0;
+            z-index: 997;
+        }
+    </style>
+</head>
+<body>
+    <!-- Blood drips -->
+    <div class="blood-drip" style="left: 10%"></div>
+    <div class="blood-drip" style="left: 30%"></div>
+    <div class="blood-drip" style="left: 50%"></div>
+    <div class="blood-drip" style="left: 70%"></div>
+    <div class="blood-drip" style="left: 90%"></div>
+
+    <!-- Blood splatter overlay -->
+    <div class="blood-splatter"></div>
+
+    <nav class="navbar">
+        <div class="nav-content">
+            <a href="#" class="logo">GTD Visualizations</a>
+            <div class="nav-links">
+                <a href="#choropleth">Geographical Distribution</a>
+                <a href="#sankey">Attack Trends</a>
+                <a href="#pareto">Impact Analysis</a>
+                <a href="#timeline">Time Analysis</a>
+                <a href="#organizations">Terror Groups</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="slideshow">
+        <div class="slide active" style="background-image: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url('https://image-timescontent.timesgroup.com/thumb/626208.webp')">
+            <div class="slide-content">
+                <h2>Global Terrorism Database Visualization</h2>
+                <p>Explore comprehensive visualizations of terrorist activities worldwide from 1970 to present</p>
+            </div>
+        </div>
+        <div class="slide" style="background-image: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url('https://majorgauravarya.wordpress.com/wp-content/uploads/2017/05/img_2088-2.jpg?w=1200')">
+            <div class="slide-content">
+                <h2>Data-Driven Insights</h2>
+                <p>Understanding patterns and trends through interactive visualizations</p>
+            </div>
+        </div>
+        <div class="slide" style="background-image: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url('https://i.natgeofe.com/k/daa6c240-6eff-4f34-9437-3f57f0dc5a09/World-Trade-Centers_911_Reference_KIDS_0821_2x1.jpg')">
+            <div class="slide-content">
+                <h2>Research & Analysis</h2>
+                <p>Supporting policy makers and researchers with comprehensive terrorism data analysis</p>
+            </div>
+        </div>
+    </div>
+
+    <section class="visualizations">
+        <div class="vis-card" id="choropleth">
+            <h3>Terrorism Across Borders</h3>
+            <p>Interactive choropleth map visualization showing the geographical distribution of terrorist attacks worldwide. Track changes over time and explore regional patterns with our dynamic time slider and detailed hover information.</p>
+            <br>
+            <a href="chloropeth.html" class="vis-link">View Geographical Distribution →</a>
+        </div>
+
+        <div class="vis-card" id="sankey">
+            <h3>Attack and Weapon Trends</h3>
+            <p>Explore the relationships between attack types, targets, and weapons through an interactive Sankey diagram. Understand terrorist strategies and their evolution over time through comprehensive flow visualization.</p>
+            <br>
+            <a href="./2.html" class="vis-link">View Attack Trends →</a>
+        </div>
+
+        <div class="vis-card" id="pareto">
+            <h3>Human Cost of Terrorism</h3>
+            <p>Analyze the impact of different attack types on casualties through our interactive Pareto chart. Understand which attack methods cause the most harm and track their relative contribution to overall casualties.</p>
+            <br>
+            <a href="./3 (4).html" class="vis-link">View Impact Analysis →</a>
+        </div>
+
+        <div class="vis-card" id="timeline">
+            <h3>Temporal Attack Patterns</h3>
+            <p>Explore the evolution of terrorist incidents over time through interactive line charts and heatmaps. 
+               Analyze year-wise trends from 1970 to 2023 and discover seasonal patterns in attack frequencies. 
+               Filter by regions and attack types to understand temporal variations in terrorist activities.</p>
+            <br>
+            <a href="./line.html" class="vis-link">View Time Analysis →</a>
+        </div>
+
+        <div class="vis-card" id="organizations">
+            <h3>Terrorist Organization Analysis</h3>
+            <p>Comprehensive database analysis of terrorist organizations worldwide. Compare attack frequencies, 
+               success rates, and casualty counts through interactive tables and bar graphs. Understand the operational 
+               patterns and impact of different terrorist groups.</p>
+            <br>
+            <a href="./5.html" class="vis-link">View Organization Analysis →</a>
+        </div>
+    </section>
+
+    <script>
+        // Slideshow functionality
+        const slides = document.querySelectorAll('.slide');
+        let currentSlide = 0;
+
+        function showSlide(index) {
+            slides.forEach(slide => slide.classList.remove('active'));
+            slides[index].classList.add('active');
+        }
+
+        function nextSlide() {
+            currentSlide = (currentSlide + 1) % slides.length;
+            showSlide(currentSlide);
+        }
+
+        setInterval(nextSlide, 5000);
+
+        // Scroll animation
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, {
+            threshold: 0.1
+        });
+
+        document.querySelectorAll('.vis-card').forEach(card => {
+            observer.observe(card);
+        });
+
+        // Blood cursor trail effect
+        document.addEventListener('mousemove', (e) => {
+            if (Math.random() < 0.1) { // Only create drops 10% of the time for performance
+                const drop = document.createElement('div');
+                drop.className = 'blood-drop';
+                drop.style.left = e.clientX + 'px';
+                drop.style.top = e.clientY + 'px';
+                document.body.appendChild(drop);
+
+                // Animate the drop
+                requestAnimationFrame(() => {
+                    drop.style.opacity = '0.5';
+                    setTimeout(() => {
+                        drop.style.opacity = '0';
+                        setTimeout(() => {
+                            document.body.removeChild(drop);
+                        }, 1000);
+                    }, 100);
+                });
+            }
+
+            // Update blood splatter effect
+            const splatter = document.querySelector('.blood-splatter');
+            splatter.style.setProperty('--x', e.clientX + 'px');
+            splatter.style.setProperty('--y', e.clientY + 'px');
+            splatter.style.opacity = '1';
+            setTimeout(() => {
+                splatter.style.opacity = '0';
+            }, 500);
+        });
+
+        // Smooth scrolling for navigation links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function(e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'center'
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>

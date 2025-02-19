@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>GTD Analysis Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Roboto:wght@300;400;700&display=swap');
+
+        :root {
+            --dark-red: #8b0000;
+            --blood-red: #660000;
+            --fresh-blood: #bb0a1e;
+            --charcoal: #333;
+            --smoke: rgba(255, 255, 255, 0.9);
+        }
+
+        body { 
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+            background: #1a1a1a;
+            color: var(--smoke);
+            min-height: 100vh;
+            padding-top: 80px;
+        }
+
+        /* Blood drip animation from index.html */
+        .blood-drip {
+            position: fixed;
+            top: 0;
+            width: 2px;
+            height: 0;
+            background: linear-gradient(var(--fresh-blood), var(--blood-red));
+            animation: drip 3s infinite;
+            opacity: 0.7;
+            z-index: 999;
+        }
+
+        @keyframes drip {
+            0% { height: 0; top: 0; }
+            70% { height: 100px; top: 0; }
+            100% { height: 0; top: 100px; }
+        }
+
+        .dashboard {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .filters-section {
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid var(--fresh-blood);
+        }
+
+        .filters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        select, input {
+            width: 100%;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--fresh-blood);
+            border-radius: 4px;
+            color: var(--smoke);
+            cursor: pointer;
+        }
+
+        select option {
+            background: #1a1a1a;
+            color: var(--smoke);
+            padding: 10px;
+        }
+
+        select:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .card {
+            box-shadow: 0 0 30px rgba(187, 10, 30, 0.3);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
+            gap: 20px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+
+        .stat-box {
+            background: rgba(187, 10, 30, 0.1);
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+            border: 1px solid var(--fresh-blood);
+            transition: transform 0.3s;
+        }
+
+        .stat-box:hover {
+            transform: scale(1.05);
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--fresh-blood);
+            text-shadow: 0 0 5px rgba(187, 10, 30, 0.5);
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: var(--smoke);
+        }
+
+        h1, h2 {
+            font-family: 'Cinzel', serif;
+            color: var(--smoke);
+            text-shadow: 0 0 10px var(--fresh-blood);
+        }
+
+        /* Chart Styles */
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+
+        path, rect {
+            transition: fill 0.3s;
+        }
+
+        path:hover, rect:hover {
+            fill: var(--fresh-blood);
+        }
+
+        .tooltip {
+            position: absolute;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.9);
+            color: var(--smoke);
+            border: 1px solid var(--fresh-blood);
+            border-radius: 4px;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--fresh-blood);
+            border-radius: 5px;
+        }
+
+        /* Loading Animation */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 24px;
+            color: var(--fresh-blood);
+            text-shadow: 0 0 10px var(--fresh-blood);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.5; }
+            50% { opacity: 1; }
+            100% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Blood drips -->
+    <div class="blood-drip" style="left: 10%"></div>
+    <div class="blood-drip" style="left: 30%"></div>
+    <div class="blood-drip" style="left: 50%"></div>
+    <div class="blood-drip" style="left: 70%"></div>
+    <div class="blood-drip" style="left: 90%"></div>
+
+    <div class="dashboard">
+        <div class="card">
+            <h1>Terroist Org Analysis</h1>
+            <div class="filters-section">
+                <h2>Filters & Analysis</h2>
+                <div class="filters-grid">
+                    <div>
+                        <label>Organization</label>
+                        <select id="groupSelect">
+                            <option value="">Select Organization</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Sort By</label>
+                        <select id="sortSelect">
+                            <option value="name">Name</option>
+                            <option value="attacks">Number of Attacks</option>
+                            <option value="casualties">Total Casualties</option>
+                            <option value="countries">Countries Active</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Min. Attacks</label>
+                        <input type="number" id="minAttacks" min="0" value="0">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="loading" class="loading">
+            <i class="fas fa-skull fa-spin"></i> Loading data...
+        </div>
+        
+        <div id="dashboard-content" style="display: none;">
+            <div class="grid">
+                <div class="card">
+                    <h2>Key Statistics</h2>
+                    <div class="stats-grid">
+                        <div class="stat-box">
+                            <div class="stat-value" id="totalIncidents">-</div>
+                            <div class="stat-label">Total Incidents</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value" id="successRate">-</div>
+                            <div class="stat-label">Success Rate</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value" id="totalKilled">-</div>
+                            <div class="stat-label">Total Casualties</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-value" id="yearlyAvg">-</div>
+                            <div class="stat-label">Yearly Average</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h2>Attack Types Distribution</h2>
+                    <div id="attackTypeChart"></div>
+                </div>
+                
+                <div class="card">
+                    <h2>Regional Activity</h2>
+                    <div id="regionChart"></div>
+                </div>
+                
+                <div class="card">
+                    <h2>Weapon Types Used</h2>
+                    <div id="weaponChart"></div>
+                </div>
+                
+                <div class="card full-width">
+                    <h2>Incidents Over Time</h2>
+                    <div id="timelineChart"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Load and process the data
+        d3.csv("gtd.csv").then(function(data) {
+            // Process the data
+            const groupedData = d3.group(data, d => d.gname);
+            const groups = Array.from(groupedData.keys())
+                .filter(name => name && name !== "Unknown" && name !== "");
+            
+            // Populate select
+            const select = document.getElementById('groupSelect');
+            groups.sort().forEach(group => {
+                const option = document.createElement('option');
+                option.value = group;
+                option.textContent = group;
+                select.appendChild(option);
+            });
+
+            // Hide loading, show dashboard
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('dashboard-content').style.display = 'block';
+
+            function processGroupData(groupName) {
+                const groupData = data.filter(d => d.gname === groupName);
+                
+                // Calculate statistics
+                const stats = {
+                    totalIncidents: groupData.length,
+                    successRate: d3.mean(groupData, d => +d.success) * 100,
+                    totalKilled: d3.sum(groupData, d => +d.nkill || 0),
+                    yearlyAvg: groupData.length / d3.groups(groupData, d => d.iyear).size
+                };
+
+                // Process attack types
+                const attackTypes = d3.rollup(groupData,
+                    v => v.length,
+                    d => d.attacktype1_txt
+                );
+
+                // Process regions
+                const regions = d3.rollup(groupData,
+                    v => v.length,
+                    d => d.region_txt
+                );
+
+                // Process weapons
+                const weapons = d3.rollup(groupData,
+                    v => v.length,
+                    d => d.weaptype1_txt
+                );
+
+                // Process timeline
+                const timeline = d3.rollup(groupData,
+                    v => v.length,
+                    d => d.iyear
+                );
+
+                return {
+                    stats,
+                    attackTypes: Array.from(attackTypes, ([key, value]) => ({type: key, count: value})),
+                    regions: Array.from(regions, ([key, value]) => ({region: key, count: value})),
+                    weapons: Array.from(weapons, ([key, value]) => ({type: key, count: value})),
+                    timeline: Array.from(timeline, ([year, count]) => ({year: +year, count}))
+                };
+            }
+
+            function updateDashboard(groupName) {
+                const processedData = processGroupData(groupName);
+                
+                // Update statistics
+                document.getElementById('totalIncidents').textContent = processedData.stats.totalIncidents.toLocaleString();
+                document.getElementById('successRate').textContent = `${processedData.stats.successRate.toFixed(1)}%`;
+                document.getElementById('totalKilled').textContent = processedData.stats.totalKilled.toLocaleString();
+                document.getElementById('yearlyAvg').textContent = Math.round(processedData.stats.yearlyAvg).toLocaleString();
+
+                // Create visualizations
+                createPieChart('#attackTypeChart', processedData.attackTypes, 'type', 'count');
+                createBarChart('#regionChart', processedData.regions, 'region', 'count');
+                createBarChart('#weaponChart', processedData.weapons, 'type', 'count');
+                createTimelineChart('#timelineChart', processedData.timeline);
+            }
+
+            function createPieChart(selector, data, labelKey, valueKey) {
+                const width = 400;
+                const height = 300;
+                const radius = Math.min(width, height) / 2;
+
+                d3.select(selector).selectAll("*").remove();
+
+                const svg = d3.select(selector)
+                    .append("svg")
+                    .attr("width", width)
+                    .attr("height", height)
+                    .append("g")
+                    .attr("transform", `translate(${width/2},${height/2})`);
+
+                const color = d3.scaleOrdinal(d3.schemeCategory10);
+
+                const pie = d3.pie()
+                    .value(d => d[valueKey]);
+
+                const arc = d3.arc()
+                    .innerRadius(0)
+                    .outerRadius(radius);
+
+                const arcs = svg.selectAll("arc")
+                    .data(pie(data))
+                    .enter()
+                    .append("g");
+
+                arcs.append("path")
+                    .attr("d", arc)
+                    .attr("fill", d => color(d.data[labelKey]));
+
+                arcs.append("text")
+                    .attr("transform", d => `translate(${arc.centroid(d)})`)
+                    .attr("text-anchor", "middle")
+                    .text(d => d.data[labelKey]);
+            }
+
+            function createBarChart(selector, data, labelKey, valueKey) {
+                const margin = {top: 20, right: 20, bottom: 60, left: 40};
+                const width = 400 - margin.left - margin.right;
+                const height = 300 - margin.top - margin.bottom;
+
+                d3.select(selector).selectAll("*").remove();
+
+                const svg = d3.select(selector)
+                    .append("svg")
+                    .attr("width", width + margin.left + margin.right)
+                    .attr("height", height + margin.top + margin.bottom)
+                    .append("g")
+                    .attr("transform", `translate(${margin.left},${margin.top})`);
+
+                const x = d3.scaleBand()
+                    .range([0, width])
+                    .padding(0.1);
+
+                const y = d3.scaleLinear()
+                    .range([height, 0]);
+
+                x.domain(data.map(d => d[labelKey]));
+                y.domain([0, d3.max(data, d => d[valueKey])]);
+
+                svg.append("g")
+                    .attr("transform", `translate(0,${height})`)
+                    .call(d3.axisBottom(x))
+                    .selectAll("text")
+                    .style("text-anchor", "end")
+                    .attr("transform", "rotate(-45)");
+
+                svg.append("g")
+                    .call(d3.axisLeft(y));
+
+                svg.selectAll(".bar")
+                    .data(data)
+                    .enter().append("rect")
+                    .attr("class", "bar")
+                    .attr("x", d => x(d[labelKey]))
+                    .attr("width", x.bandwidth())
+                    .attr("y", d => y(d[valueKey]))
+                    .attr("height", d => height - y(d[valueKey]))
+                    .attr("fill", "#3b82f6");
+            }
+
+            function createTimelineChart(selector, data) {
+                const margin = {top: 20, right: 20, bottom: 30, left: 40};
+                const width = 1000 - margin.left - margin.right;
+                const height = 300 - margin.top - margin.bottom;
+
+                d3.select(selector).selectAll("*").remove();
+
+                const svg = d3.select(selector)
+                    .append("svg")
+                    .attr("width", width + margin.left + margin.right)
+                    .attr("height", height + margin.top + margin.bottom)
+                    .append("g")
+                    .attr("transform", `translate(${margin.left},${margin.top})`);
+
+                const x = d3.scaleLinear()
+                    .domain(d3.extent(data, d => d.year))
+                    .range([0, width]);
+
+                const y = d3.scaleLinear()
+                    .domain([0, d3.max(data, d => d.count)])
+                    .range([height, 0]);
+
+                svg.append("g")
+                    .attr("transform", `translate(0,${height})`)
+                    .call(d3.axisBottom(x).tickFormat(d3.format("d")));
+
+                svg.append("g")
+                    .call(d3.axisLeft(y));
+
+                const line = d3.line()
+                    .x(d => x(d.year))
+                    .y(d => y(d.count));
+
+                svg.append("path")
+                    .datum(data)
+                    .attr("fill", "none")
+                    .attr("stroke", "#3b82f6")
+                    .attr("stroke-width", 2)
+                    .attr("d", line);
+            }
+
+            // Handle select change
+            select.addEventListener('change', (event) => {
+                if (event.target.value) {
+                    updateDashboard(event.target.value);
+                }
+            });
+
+            function applyFilters(data) {
+                const minAttacks = +document.getElementById('minAttacks').value;
+                const dateRange = document.getElementById('dateRange').value;
+                const sortBy = document.getElementById('sortSelect').value;
+
+                let filtered = data;
+
+                // Filter by minimum attacks
+                if (minAttacks > 0) {
+                    filtered = filtered.filter(d => {
+                        const groupData = d3.group(filtered, d => d.gname).get(d.gname);
+                        return groupData && groupData.length >= minAttacks;
+                    });
+                }
+
+                // Filter by date range
+                if (dateRange !== 'all') {
+                    filtered = filtered.filter(d => {
+                        const year = +d.iyear;
+                        switch(dateRange) {
+                            case 'recent': return year >= 2013;
+                            case 'cold': return year >= 1947 && year <= 1991;
+                            case 'post911': return year >= 2001;
+                            default: return true;
+                        }
+                    });
+                }
+
+                // Sort groups
+                const groups = Array.from(d3.group(filtered, d => d.gname).keys())
+                    .filter(name => name && name !== "Unknown" && name !== "");
+
+                if (sortBy === 'attacks') {
+                    groups.sort((a, b) => {
+                        const aCount = filtered.filter(d => d.gname === a).length;
+                        const bCount = filtered.filter(d => d.gname === b).length;
+                        return bCount - aCount;
+                    });
+                } else if (sortBy === 'casualties') {
+                    groups.sort((a, b) => {
+                        const aSum = d3.sum(filtered.filter(d => d.gname === a), d => +d.nkill || 0);
+                        const bSum = d3.sum(filtered.filter(d => d.gname === b), d => +d.nkill || 0);
+                        return bSum - aSum;
+                    });
+                } else if (sortBy === 'countries') {
+                    groups.sort((a, b) => {
+                        const aCountries = new Set(filtered.filter(d => d.gname === a).map(d => d.country_txt)).size;
+                        const bCountries = new Set(filtered.filter(d => d.gname === b).map(d => d.country_txt)).size;
+                        return bCountries - aCountries;
+                    });
+                }
+
+                return { filtered, groups };
+            }
+
+            // Add event listeners for filters
+            document.getElementById('sortSelect').addEventListener('change', updateDashboard);
+            document.getElementById('minAttacks').addEventListener('input', updateDashboard);
+            document.getElementById('dateRange').addEventListener('change', updateDashboard);
+
+            // Enhance the visualization functions with animations and interactivity
+            // ... (keep existing visualization code but add transitions and hover effects)
+        }).catch(function(error) {
+            console.log(error);
+            document.getElementById('loading').textContent = 'Error loading data. Please check the console for details.';
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Terrorism Attack Patterns Visualization</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.4/d3.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3-sankey/0.12.3/d3-sankey.min.js"></script>
+
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="blood-drip"></div>
+    <div class="blood-drip"></div>
+    <div class="blood-drip"></div>
+    <div class="blood-drip"></div>
+    <div class="blood-drip"></div>
+    
+    <div id="container">
+        <h1>Global Terrorism Attack Patterns</h1>
+        <h2>Relationships Between Attack Types, Targets, and Weapons</h2>
+        <p class="intro">
+            This interactive visualization displays relationships between terrorism attack types, targets, and weapons
+            used.
+            The width of each connection indicates the frequency of that particular pattern. Use the filters below to
+            explore specific regions, time periods, or attack characteristics.
+        </p>
+
+        <!-- Add description text -->
+        <div class="description-text">
+            <p>This Sankey diagram visualizes terrorism attack patterns across three key dimensions:</p>
+            <ul>
+                <li><strong>Attack Types (Left):</strong> Methods used in terrorist incidents</li>
+                <li><strong>Target Types (Middle):</strong> Types of victims or locations targeted</li>
+                <li><strong>Weapon Types (Right):</strong> Weapons employed in the attacks</li>
+            </ul>
+            <p>The width of each connection represents the frequency of that particular combination. Click on any node
+                to keep it highlighted, and use the search box below to quickly find specific elements.</p>
+        </div>
+
+        <!-- Add search box -->
+        <div class="search-container">
+            <input type="text" id="search-input" placeholder="Search for attack types, targets, or weapons...">
+            <button id="clear-search">Clear</button>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="region-filter">Region Filter <span class="info-icon"
+                        data-info="Filter data by geographic region">?</span></label>
+                <select id="region-filter" multiple size="3">
+                    <option value="all" selected>All Regions</option>
+                    <!-- Options will be added dynamically -->
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="year-range">Year Range <span class="info-icon"
+                        data-info="Select the range of years to analyze">?</span></label>
+                <div style="display: flex; align-items: center; gap: 5px;">
+                    <input type="number" id="year-start" min="1970" max="2022" placeholder="From year">
+                    <span>to</span>
+                    <input type="number" id="year-end" min="1970" max="2022" placeholder="To year">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label for="min-incidents">Minimum Incidents <span class="info-icon"
+                        data-info="Only show connections with at least this many incidents">?</span></label>
+                <input type="number" id="min-incidents" min="1" value="10">
+            </div>
+
+            <div class="control-group" style="justify-content: flex-end;">
+                <button id="apply-filters">Apply Filters</button>
+                <button id="reset-filters" style="margin-top: 5px; background-color: #6c757d;">Reset</button>
+            </div>
+        </div>
+
+        <div class="stats-container" id="stats-container">
+            <!-- Stats will be added dynamically -->
+        </div>
+
+        <div id="loading">Loading data, please wait...</div>
+        <div id="error"></div>
+        <div id="no-data-message">No data matches the current filter criteria. Please adjust your filters.</div>
+        <div id="chart"></div>
+        <div id="tooltip"></div>
+
+        <div class="legend-container">
+            <div class="legend-title">Legend (Click to highlight related flows)</div>
+            <div class="legend" id="legend"></div>
+        </div>
+
+        <div class="info-tooltip" id="info-tooltip"></div>
+    </div>
+
+    <!-- Replace the insights-container div with this updated version -->
+    <div class="insights-container">
+        <div class="insights-title">Analysis Overview</div>
+        <div id="key-insights"></div>
+        <div class="top-charts">
+            <div class="top-chart" id="top-attacks">
+                <h3>Attack Types Distribution</h3>
+            </div>
+            <div class="top-chart" id="top-targets">
+                <h3>Target Types Distribution</h3>
+            </div>
+            <div class="top-chart" id="top-weapons">
+                <h3>Weapon Types Distribution</h3>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Set up dimensions and margins
+        const margin = { top: 20, right: 30, bottom: 20, left: 30 };
+        const width = 1200 - margin.left - margin.right;
+        const height = 700 - margin.top - margin.bottom;
+
+        // Initialize variables
+        let allData = [];
+        let filteredData = [];
+        let regions = [];
+        let nodes = [];
+        let sankeyNodes = [];
+        let sankeyLinks = [];
+        let selectedNode = null; // Add selected node tracking
+
+        // Create the SVG container
+        const svg = d3.select("#chart").append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", `translate(${margin.left},${margin.top})`);
+
+        // Set up info tooltip functionality
+        d3.selectAll(".info-icon").on("mouseover", function (event) {
+            const info = this.getAttribute("data-info");
+            const infoTooltip = d3.select("#info-tooltip");
+
+            infoTooltip
+                .html(info)
+                .style("left", (event.pageX + 10) + "px")
+                .style("top", (event.pageY - 30) + "px")
+                .style("opacity", 1);
+        }).on("mouseout", function () {
+            d3.select("#info-tooltip").style("opacity", 0);
+        });
+
+        // Load CSV data
+        d3.csv("gtd.csv").then(function (data) {
+            // Hide loading message
+            d3.select("#loading").style("display", "none");
+
+            // Store all data
+            allData = data;
+
+            // Extract unique regions for filter
+            regions = Array.from(new Set(data.map(d => d.region_txt))).filter(r => r !== "" && r !== "Unknown");
+            regions.sort();
+
+            // Populate region filter
+            const regionFilter = d3.select("#region-filter");
+            regions.forEach(region => {
+                regionFilter.append("option")
+                    .attr("value", region)
+                    .text(region);
+            });
+
+            // Set default year range
+            const years = data.map(d => +d.iyear).filter(y => !isNaN(y));
+            const minYear = d3.min(years) || 1970;
+            const maxYear = d3.max(years) || 2022;
+
+            d3.select("#year-start").attr("min", minYear).attr("max", maxYear).attr("value", minYear);
+            d3.select("#year-end").attr("min", minYear).attr("max", maxYear).attr("value", maxYear);
+
+            // Initialize visualization with all data
+            processAndVisualize(data);
+
+            // Add event listeners for filters
+            d3.select("#apply-filters").on("click", applyFilters);
+            d3.select("#reset-filters").on("click", resetFilters);
+        })
+            .catch(function (error) {
+                console.error("Error loading the CSV file:", error);
+                d3.select("#loading").style("display", "none");
+                d3.select("#error")
+                    .style("display", "block")
+                    .text("An error occurred while loading the data. Please check if gtd.csv file is properly formatted and accessible.");
+            });
+
+        function applyFilters() {
+            // Get selected regions
+            const selectedRegions = Array.from(d3.select("#region-filter").node().selectedOptions)
+                .map(option => option.value);
+
+            // Get year range
+            const startYear = +d3.select("#year-start").property("value");
+            const endYear = +d3.select("#year-end").property("value");
+
+            // Get minimum incidents threshold
+            const minIncidents = +d3.select("#min-incidents").property("value") || 1;
+
+            // Filter data
+            let filtered = allData;
+
+            if (!selectedRegions.includes("all")) {
+                filtered = filtered.filter(d => selectedRegions.includes(d.region_txt));
+            }
+
+            if (!isNaN(startYear)) {
+                filtered = filtered.filter(d => +d.iyear >= startYear);
+            }
+
+            if (!isNaN(endYear)) {
+                filtered = filtered.filter(d => +d.iyear <= endYear);
+            }
+
+            // Store min incidents for use in processAndVisualize
+            d3.select("#min-incidents").property("value", minIncidents);
+
+            // Update visualization
+            processAndVisualize(filtered, minIncidents);
+        }
+
+        function resetFilters() {
+            // Reset region filter
+            d3.select("#region-filter").selectAll("option").property("selected", function () {
+                return this.value === "all";
+            });
+
+            // Reset year range
+            const years = allData.map(d => +d.iyear).filter(y => !isNaN(y));
+            const minYear = d3.min(years) || 1970;
+            const maxYear = d3.max(years) || 2022;
+
+            d3.select("#year-start").property("value", minYear);
+            d3.select("#year-end").property("value", maxYear);
+
+            // Reset minimum incidents
+            d3.select("#min-incidents").property("value", 10);
+
+            // Rerun visualization with all data
+            processAndVisualize(allData, 10);
+        }
+
+        function processAndVisualize(data, minIncidentsThreshold = 10) {
+            // Clear previous visualization
+            svg.selectAll("*").remove();
+            d3.select("#legend").html("");
+
+            // Process the data for the Sankey diagram
+            filteredData = data;
+            const links = [];
+            const attackTargetLinks = {};
+            const targetWeaponLinks = {};
+
+            // Process data to create links
+            data.forEach(d => {
+                // Skip entries with invalid attack, target, or weapon types
+                if (!d.attacktype1_txt || !d.targtype1_txt || !d.weaptype1_txt ||
+                    d.attacktype1_txt === "Unknown" || d.targtype1_txt === "Unknown" || d.weaptype1_txt === "Unknown") {
+                    return;
+                }
+
+                // Create unique key for attack-target pair
+                const attackTargetKey = `${d.attacktype1_txt}|${d.targtype1_txt}`;
+                if (!attackTargetLinks[attackTargetKey]) {
+                    attackTargetLinks[attackTargetKey] = {
+                        source: d.attacktype1_txt,
+                        target: d.targtype1_txt,
+                        value: 0,
+                        type: "attack-target"
+                    };
+                }
+                attackTargetLinks[attackTargetKey].value += 1;
+
+                // Create unique key for target-weapon pair
+                const targetWeaponKey = `${d.targtype1_txt}|${d.weaptype1_txt}`;
+                if (!targetWeaponLinks[targetWeaponKey]) {
+                    targetWeaponLinks[targetWeaponKey] = {
+                        source: d.targtype1_txt,
+                        target: d.weaptype1_txt,
+                        value: 0,
+                        type: "target-weapon"
+                    };
+                }
+                targetWeaponLinks[targetWeaponKey].value += 1;
+            });
+
+            // Convert link objects to arrays
+            Object.values(attackTargetLinks).forEach(link => links.push(link));
+            Object.values(targetWeaponLinks).forEach(link => links.push(link));
+
+            // Filter out links with values below threshold
+            const filteredLinks = links.filter(d => d.value >= minIncidentsThreshold);
+
+            // Check if we have any data after filtering
+            if (filteredLinks.length === 0) {
+                d3.select("#chart svg").style("display", "none");
+                d3.select("#no-data-message").style("display", "block");
+                updateStats(data, []);
+                updateInsights(data, []);
+                return;
+            } else {
+                d3.select("#chart svg").style("display", "block");
+                d3.select("#no-data-message").style("display", "none");
+            }
+
+            // Extract unique nodes
+            const nodeMap = {};
+            filteredLinks.forEach(d => {
+                if (!nodeMap[d.source]) nodeMap[d.source] = { name: d.source, category: getCategoryFromNode(d.source, d.type) };
+                if (!nodeMap[d.target]) nodeMap[d.target] = { name: d.target, category: getCategoryFromNode(d.target, d.type) };
+            });
+
+            nodes = Object.values(nodeMap);
+
+            // Map nodes to source/target indices
+            const nodeIndices = {};
+            nodes.forEach((node, i) => {
+                nodeIndices[node.name] = i;
+            });
+
+            // Update links with node indices
+            sankeyLinks = filteredLinks.map(d => ({
+                source: nodeIndices[d.source],
+                target: nodeIndices[d.target],
+                value: d.value,
+                type: d.type,
+                sourceName: d.source,
+                targetName: d.target
+            }));
+
+            // Get categories for coloring
+            const attackTypes = nodes.filter(n => n.category === "Attack Type").map(n => n.name);
+            const targetTypes = nodes.filter(n => n.category === "Target Type").map(n => n.name);
+            const weaponTypes = nodes.filter(n => n.category === "Weapon Type").map(n => n.name);
+
+            // Generate color scheme for nodes
+            const attackColorScale = d3.scaleOrdinal()
+                .domain(attackTypes)
+                .range(d3.schemeReds[9].slice(3));
+
+            const targetColorScale = d3.scaleOrdinal()
+                .domain(targetTypes)
+                .range(d3.schemeBlues[9].slice(3));
+
+            const weaponColorScale = d3.scaleOrdinal()
+                .domain(weaponTypes)
+                .range(d3.schemeGreens[9].slice(3));
+
+            const getNodeColor = (nodeName) => {
+                if (attackTypes.includes(nodeName)) return attackColorScale(nodeName);
+                if (targetTypes.includes(nodeName)) return targetColorScale(nodeName);
+                if (weaponTypes.includes(nodeName)) return weaponColorScale(nodeName);
+                return "#888"; // Default color
+            };
+
+            // Create Sankey diagram
+            const sankey = d3.sankey()
+                .nodeId(d => d.index)
+                .nodeWidth(25)
+                .nodePadding(12)
+                .extent([[0, 10], [width, height - 10]]);
+
+            // Generate the diagram
+            const sankeyData = sankey({
+                nodes: nodes.map((d, i) => ({ ...d, index: i })),
+                links: sankeyLinks
+            });
+
+            sankeyNodes = sankeyData.nodes;
+
+            // Add the links
+            const link = svg.append("g")
+                .selectAll(".link")
+                .data(sankeyData.links)
+                .enter().append("path")
+                .attr("class", "link")
+                .attr("d", d3.sankeyLinkHorizontal())
+                .attr("stroke", d => {
+                    // Use source node color for attack-target links and target node color for target-weapon links
+                    return d.type === "attack-target" ? getNodeColor(nodes[d.source.index].name) : getNodeColor(nodes[d.target.index].name);
+                })
+                .attr("stroke-width", d => Math.max(1, d.width))
+                .style("opacity", 0.7)
+                .on("mouseover", function (event, d) {
+                    highlightLink(d);
+
+                    const source = nodes[d.source.index].name;
+                    const target = nodes[d.target.index].name;
+                    const value = d.value;
+                    const percent = ((d.value / d.source.value) * 100).toFixed(1);
+
+                    d3.select("#tooltip")
+                        .style("opacity", 1)
+                        .style("left", (event.pageX + 10) + "px")
+                        .style("top", (event.pageY - 10) + "px")
+                        .html(`
+                <div class="tooltip-title">${source} → ${target}</div>
+                <div class="tooltip-content">
+                <strong>Incidents:</strong> ${value.toLocaleString()}<br/>
+                <strong>Percentage:</strong> ${percent}% of ${source} incidents<br/>
+                <strong>Link Type:</strong> ${d.type === "attack-target" ? "Attack to Target" : "Target to Weapon"}
+                </div>
+            `);
+                })
+                .on("mouseout", function () {
+                    resetHighlighting();
+                    d3.select("#tooltip").style("opacity", 0);
+                });
+
+            // Add the nodes
+            const node = svg.append("g")
+                .selectAll(".node")
+                .data(sankeyNodes)
+                .enter().append("g")
+                .attr("class", "node")
+                .attr("transform", d => `translate(${d.x0},${d.y0})`)
+                .on("click", function (event, d) {
+                    event.stopPropagation();
+                    if (selectedNode === d) {
+                        selectedNode = null;
+                        resetHighlighting();
+                    } else {
+                        selectedNode = d;
+                        highlightNode(d);
+                    }
+                })
+                .on("mouseover", function (event, d) {
+                    if (!selectedNode) {
+                        highlightNode(d);
+                    }
+
+                    // Calculate incoming and outgoing links
+                    let incomingLinks = sankeyLinks.filter(l => l.target === d.index);
+                    let outgoingLinks = sankeyLinks.filter(l => l.source === d.index);
+
+                    const incomingCount = incomingLinks.reduce((sum, l) => sum + l.value, 0);
+                    const outgoingCount = outgoingLinks.reduce((sum, l) => sum + l.value, 0);
+
+                    // Prepare tooltip content
+                    let tooltipContent = `<div class="tooltip-title">${d.name}</div>
+            <div class="tooltip-content">
+                <strong>Category:</strong> ${d.category}<br/>
+                <strong>Total Incidents:</strong> ${d.value.toLocaleString()}<br/>`;
+
+                    if (incomingCount > 0) {
+                        tooltipContent += `<strong>Incoming:</strong> ${incomingCount.toLocaleString()}<br/>`;
+                    }
+
+                    if (outgoingCount > 0) {
+                        tooltipContent += `<strong>Outgoing:</strong> ${outgoingCount.toLocaleString()}<br/>`;
+                    }
+
+                    // If it's a target type, show top incoming attacks and outgoing weapons
+                    if (d.category === "Target Type") {
+                        if (incomingLinks.length > 0) {
+                            const topAttacks = incomingLinks
+                                .sort((a, b) => b.value - a.value)
+                                .slice(0, 3)
+                                .map(l => `${nodes[l.source.index].name} (${l.value.toLocaleString()})`);
+
+                            tooltipContent += `<strong>Top Attack Types:</strong><br/>${topAttacks.join('<br/>')}`;
+                        }
+
+                        if (outgoingLinks.length > 0) {
+                            const topWeapons = outgoingLinks
+                                .sort((a, b) => b.value - a.value)
+                                .slice(0, 3)
+                                .map(l => `${nodes[l.target.index].name} (${l.value.toLocaleString()})`);
+
+                            tooltipContent += `<br/><strong>Top Weapons Used:</strong><br/>${topWeapons.join('<br/>')}`;
+                        }
+                    }
+
+                    tooltipContent += `</div>`;
+
+                    d3.select("#tooltip")
+                        .style("opacity", 1)
+                        .style("left", (event.pageX + 10) + "px")
+                        .style("top", (event.pageY - 10) + "px")
+                        .html(tooltipContent);
+                })
+                .on("mouseout", function () {
+                    if (!selectedNode) {
+                        resetHighlighting();
+                    }
+                    d3.select("#tooltip").style("opacity", 0);
+                });
+
+            // Add node rectangles
+            node.append("rect")
+                .attr("height", d => d.y1 - d.y0)
+                .attr("width", d => d.x1 - d.x0)
+                .attr("fill", d => getNodeColor(d.name))
+                .attr("stroke", d => d3.rgb(getNodeColor(d.name)).darker(0.5))
+                .attr("stroke-width", 1);
+
+            // Add node titles with better positioning based on node location
+            node.append("text")
+                .attr("x", d => {
+                    // Left nodes: text to the right
+                    // Middle nodes: text starts inside the node and continues outside
+                    // Right nodes: text to the left
+                    const position = getNodePosition(d, width);
+                    if (position === "left") return d.x1 - d.x0 + 6;
+                    else if (position === "middle") return (d.x1 - d.x0) / 2;
+                    else return -6;
+                })
+                .attr("y", d => (d.y1 - d.y0) / 2)
+                .attr("dy", "0.35em")
+                .attr("text-anchor", d => {
+                    const position = getNodePosition(d, width);
+                    if (position === "left") return "start";
+                    else if (position === "middle") return "middle";
+                    else return "end";
+                })
+                .text(d => truncateText(d.name, 20))
+                .append("title")
+                .text(d => d.name);
+
+            // Add category labels
+            svg.append("g")
+                .selectAll(".category-label")
+                .data([
+                    { x: 50, y: 20, text: "Attack Types" },
+                    { x: width / 2, y: 20, text: "Target Types" },
+                    { x: width - 50, y: 20, text: "Weapon Types" }
+                ])
+                .enter()
+                .append("text")
+                .attr("class", "category-label")
+                .attr("x", d => d.x)
+                .attr("y", d => d.y)
+                .attr("text-anchor", "middle")
+                .text(d => d.text);
+
+            // Create legend
+            createLegend(attackTypes, targetTypes, weaponTypes, getNodeColor);
+
+            // Update stats
+            updateStats(data, sankeyNodes);
+
+            // Highlight node on legend click
+            d3.selectAll(".legend-item").on("click", function () {
+                const nodeName = d3.select(this).attr("data-node");
+                const node = sankeyNodes.find(n => n.name === nodeName);
+                if (node) {
+                    highlightNode(node);
+                }
+            });
+
+            // Add click handler to clear selection when clicking background
+            svg.on("click", () => {
+                selectedNode = null;
+                resetHighlighting();
+            });
+
+            // Implement search functionality
+            const searchInput = d3.select("#search-input");
+            const clearButton = d3.select("#clear-search");
+
+            searchInput.on("input", function () {
+                const searchTerm = this.value.toLowerCase();
+
+                if (searchTerm === "") {
+                    resetHighlighting();
+                    return;
+                }
+
+                // Dim all nodes and links
+                node.style("opacity", 0.1);
+                link.style("opacity", 0.1);
+
+                // Highlight matching nodes and their connections
+                node.filter(d => d.name.toLowerCase().includes(searchTerm))
+                    .style("opacity", 1)
+                    .each(d => {
+                        // Highlight connected links and nodes
+                        link.filter(l => l.source.index === d.index || l.target.index === d.index)
+                            .style("opacity", 0.8);
+
+                        node.filter(n =>
+                            sankeyLinks.some(l =>
+                                (l.source.index === d.index && l.target.index === n.index) ||
+                                (l.target.index === d.index && l.source.index === n.index)
+                            ))
+                            .style("opacity", 1);
+                    });
+            });
+
+            clearButton.on("click", () => {
+                searchInput.property("value", "");
+                resetHighlighting();
+            });
+
+            // Helper functions for node positioning
+            function getNodePosition(node, width) {
+                const third = width / 3;
+                if (node.x0 < third) return "left";
+                else if (node.x0 < 2 * third) return "middle";
+                else return "right";
+            }
+
+            function truncateText(text, maxLength) {
+                return text.length > maxLength ? text.substring(0, maxLength) + "..." : text;
+            }
+
+            // Functions for highlighting
+            function highlightLink(d) {
+                // Dim all links
+                link.style("opacity", 0.1);
+
+                // Highlight the selected link
+                d3.select(event.currentTarget).style("opacity", 0.8);
+            }
+
+            function highlightNode(d) {
+                // Dim all nodes and links
+                node.classed("selected", n => n === selectedNode);
+                node.selectAll("rect").style("opacity", 0.3);
+                link.style("opacity", 0.1);
+
+                // Highlight the selected node
+                node.filter(n => n.index === d.index)
+                    .selectAll("rect")
+                    .style("opacity", 1)
+                    .style("stroke-width", 2);
+
+                // Highlight connected links and nodes
+                link.filter(l => l.source.index === d.index || l.target.index === d.index)
+                    .style("opacity", 0.8);
+
+                node.filter(n =>
+                    sankeyLinks.some(l =>
+                        (l.source.index === d.index && l.target.index === n.index) ||
+                        (l.target.index === d.index && l.source.index === n.index)
+                    ))
+                    .selectAll("rect")
+                    .style("opacity", 1);
+            }
+
+            function resetHighlighting() {
+                node.selectAll("rect").style("opacity", 0.9).style("stroke-width", 1);
+                link.style("opacity", 0.7);
+            }
+
+            // Add new function to update insights
+            function updateInsights(data, nodes) {
+                const insights = d3.select("#key-insights");
+                insights.html("");
+
+                // Calculate basic statistics
+                const totalIncidents = data.length;
+                const years = Array.from(new Set(data.map(d => +d.iyear))).sort();
+                const timeRange = `${d3.min(years)} - ${d3.max(years)}`;
+                
+                // Calculate casualties
+                const totalDeaths = d3.sum(data, d => isNaN(+d.nkill) ? 0 : +d.nkill);
+                const totalInjuries = d3.sum(data, d => isNaN(+d.nwound) ? 0 : +d.nwound);
+                const avgDeathsPerIncident = (totalDeaths / totalIncidents).toFixed(2);
+
+                // Attack type analysis
+                const attackTypeStats = d3.rollups(data,
+                    v => ({
+                        total: v.length,
+                        deaths: d3.sum(v, d => isNaN(+d.nkill) ? 0 : +d.nkill)
+                    }),
+                    d => d.attacktype1_txt
+                ).filter(([type]) => type !== "Unknown" && type !== "");
+
+                // Sort for different metrics
+                const mostFrequent = [...attackTypeStats].sort((a, b) => b[1].total - a[1].total)[0];
+                const mostLethal = [...attackTypeStats]
+                    .sort((a, b) => (b[1].deaths / b[1].total) - (a[1].deaths / a[1].total))[0];
+
+                // Update insights grid
+                insights.append("div")
+                    .attr("class", "insights-grid")
+                    .html(`
+                        <div class="insight-card">
+                            <h4>Overview</h4>
+                            <p><strong>Time Period:</strong> ${timeRange}</p>
+                            <p><strong>Total Incidents:</strong> ${totalIncidents.toLocaleString()}</p>
+                            <p><strong>Most Common Attack:</strong> ${mostFrequent[0]}</p>
+                        </div>
+                        <div class="insight-card">
+                            <h4>Impact Analysis</h4>
+                            <p><strong>Total Casualties:</strong> ${(totalDeaths + totalInjuries).toLocaleString()}</p>
+                            <p><strong>Deaths:</strong> ${totalDeaths.toLocaleString()}</p>
+                            <p><strong>Injuries:</strong> ${totalInjuries.toLocaleString()}</p>
+                        </div>
+                        <div class="insight-card">
+                            <h4>Attack Patterns</h4>
+                            <p><strong>Most Lethal Type:</strong> ${mostLethal[0]}</p>
+                            <p><strong>Avg Deaths/Incident:</strong> ${avgDeathsPerIncident}</p>
+                            <p><strong>Primary Target:</strong> ${getMostCommonTarget(data)}</p>
+                        </div>
+                    `);
+
+                // Update distribution charts
+                updateTopChart("Attack Types Distribution", "attacktype1_txt", data, "#top-attacks", d3.schemeReds[9][6]);
+                updateTopChart("Target Types Distribution", "targtype1_txt", data, "#top-targets", d3.schemeBlues[9][6]);
+                updateTopChart("Weapon Types Distribution", "weaptype1_txt", data, "#top-weapons", d3.schemeGreens[9][6]);
+            }
+
+            function getMostCommonTarget(data) {
+                const targetCounts = d3.rollups(data, v => v.length, d => d.targtype1_txt)
+                    .filter(([type]) => type !== "Unknown" && type !== "");
+                return targetCounts.sort((a, b) => b[1] - a[1])[0][0];
+            }
+
+            // Update the createLegend function
+            function createLegend(attackTypes, targetTypes, weaponTypes, getColorFn) {
+                const legend = d3.select("#legend");
+                legend.html(""); // Clear existing content
+
+                // Create a single container for all types
+                const legendContainer = legend.append("div")
+                    .style("display", "flex")
+                    .style("flex-wrap", "wrap")
+                    .style("gap", "10px")
+                    .style("justify-content", "flex-start");
+
+                // Combine all types
+                const allTypes = [...attackTypes, ...targetTypes, ...weaponTypes];
+
+                // Create legend items for all types
+                allTypes.forEach(item => {
+                    const itemDiv = legendContainer.append("div")
+                        .attr("class", "legend-item")
+                        .attr("data-node", item)
+                        .style("flex-basis", "calc(33.33% - 10px)"); // Adjust width as needed
+
+                    itemDiv.append("div")
+                        .attr("class", "legend-color")
+                        .style("background-color", getColorFn(item));
+
+                    itemDiv.append("span")
+                        .text(truncateText(item, 25))
+                        .append("title")
+                        .text(item);
+                });
+            }
+
+            // Modify your processAndVisualize function to include the new insights
+            function processAndVisualize(data, minIncidentsThreshold = 10) 
+            {
+                // ...existing code...  
+                // After updating stats, add this:
+                updateInsights(data, sankeyNodes);
+
+                // ...rest of existing code...
+            }
+            
+
+            function getCategoryFromNode(nodeName, linkType) {
+                if (linkType === "attack-target" && nodeName === linkType.split("-")[0]) {
+                    return "Attack Type";
+                } else if (linkType === "target-weapon" && nodeName === linkType.split("-")[1]) {
+                    return "Weapon Type";
+                } else {
+                    return "Target Type";
+                }
+            }
+
+            function updateStats(data, nodes) {
+                const statsContainer = d3.select("#stats-container");
+                statsContainer.html("");
+
+                // Calculate statistics
+                const totalIncidents = data.length;
+                const uniqueAttackTypes = new Set(data.map(d => d.attacktype1_txt).filter(t => t && t !== "Unknown")).size;
+                const uniqueTargetTypes = new Set(data.map(d => d.targtype1_txt).filter(t => t && t !== "Unknown")).size;
+                const uniqueWeaponTypes = new Set(data.map(d => d.weaptype1_txt).filter(t => t && t !== "Unknown")).size;
+
+                // Calculate deaths and injuries if available
+                const totalDeaths = d3.sum(data, d => isNaN(+d.nkill) ? 0 : +d.nkill);
+                const totalInjuries = d3.sum(data, d => isNaN(+d.nwound) ? 0 : +d.nwound);
+
+                // If we have node data, find the most common attack type, target, and weapon
+                let mostCommonAttack = "N/A";
+                let mostCommonTarget = "N/A";
+                let mostCommonWeapon = "N/A";
+
+                if (nodes.length > 0) {
+                    const attackNodes = nodes.filter(n => n.category === "Attack Type");
+                    const targetNodes = nodes.filter(n => n.category === "Target Type");
+                    const weaponNodes = nodes.filter(n => n.category === "Weapon Type");
+
+                    if (attackNodes.length > 0) {
+                        mostCommonAttack = attackNodes.reduce((prev, current) =>
+                            (prev.value > current.value) ? prev : current).name;
+                    }
+
+                    if (targetNodes.length > 0) {
+                        mostCommonTarget = targetNodes.reduce((prev, current) =>
+                            (prev.value > current.value) ? prev : current).name;
+                    }
+
+                    if (weaponNodes.length > 0) {
+                        mostCommonWeapon = weaponNodes.reduce((prev, current) =>
+                            (prev.value > current.value) ? prev : current).name;
+                    }
+                }
+
+                // Add stat cards
+                addStatCard("Total Incidents", totalIncidents.toLocaleString());
+                addStatCard("Deaths", totalDeaths.toLocaleString());
+                addStatCard("Injuries", totalInjuries.toLocaleString());
+                addStatCard("Most Common Attack", mostCommonAttack);
+                addStatCard("Most Common Target", mostCommonTarget);
+                addStatCard("Most Common Weapon", mostCommonWeapon);
+
+                function addStatCard(label, value) {
+                    const card = statsContainer.append("div")
+                        .attr("class", "stat-card");
+
+                    card.append("div")
+                        .attr("class", "stat-value")
+                        .text(value);
+
+                    card.append("div")
+                        .attr("class", "stat-label")
+                        .text(label);
+                }
+            }
+        }
+    </script>
+</body>
+
+</html>

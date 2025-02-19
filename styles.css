@@ -1,0 +1,682 @@
+:root {
+    --dark-red: #8b0000;
+    --blood-red: #660000;
+    --fresh-blood: #bb0a1e;
+    --charcoal: #333;
+    --smoke: rgba(255, 255, 255, 0.9);
+}
+
+body {
+    font-family: 'Roboto', sans-serif;
+    background-color: #1a1a1a;
+    color: var(--smoke);
+    margin: 0;
+    padding: 20px;
+}
+
+#container {
+    max-width: 1400px;
+    margin: 0 auto;
+    background-color: rgba(0, 0, 0, 0.8);
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid var(--fresh-blood);
+    box-shadow: 0 0 20px rgba(187, 10, 30, 0.3);
+}
+
+h1, h2 {
+    font-family: 'Cinzel', serif;
+    text-align: center;
+    color: var(--smoke);
+    text-shadow: 0 0 10px var(--fresh-blood);
+}
+
+p.intro {
+    max-width: 800px;
+    margin: 0 auto 20px;
+    line-height: 1.5;
+    text-align: center;
+    font-size: 15px;
+    color: var(--smoke);
+}
+
+.controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: rgba(0, 0, 0, 0.6);
+    border: 1px solid var(--fresh-blood);
+    border-radius: 8px;
+    box-shadow: 0 0 15px rgba(187, 10, 30, 0.2);
+}
+
+.control-group {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 200px;
+    background-color: rgba(20, 20, 20, 0.8);
+    padding: 15px;
+    border-radius: 6px;
+    border: 1px solid var(--blood-red);
+}
+
+.control-group label {
+    color: var(--smoke);
+    font-weight: 600;
+    margin-bottom: 8px;
+    display: block;
+}
+
+select, input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--blood-red);
+    border-radius: 4px;
+    background-color: rgba(30, 30, 30, 0.9);
+    font-size: 14px;
+    color: var(--smoke);
+    transition: all 0.3s;
+}
+
+select:focus, input:focus {
+    border-color: var(--fresh-blood);
+    box-shadow: 0 0 10px var(--fresh-blood);
+    outline: none;
+}
+
+select[multiple] {
+    height: 150px;
+    overflow-y: auto;
+}
+
+select[multiple] option {
+    padding: 8px 12px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+select[multiple] option:hover {
+    background-color: rgba(187, 10, 30, 0.2);
+    color: var(--smoke);
+}
+
+select[multiple] option:checked {
+    background-color: var(--fresh-blood);
+    color: var(--smoke);
+}
+
+button {
+    background-color: var(--dark-red);
+    color: var(--smoke);
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s, transform 0.1s;
+}
+
+button:hover {
+    background-color: var(--fresh-blood);
+    box-shadow: 0 0 15px var(--fresh-blood);
+    transform: translateY(-1px);
+}
+
+button:active {
+    transform: translateY(0);
+}
+
+#reset-filters {
+    background-color: #6c757d;
+}
+
+#reset-filters:hover {
+    background-color: #5a6268;
+}
+
+.node rect {
+    cursor: pointer;
+    fill-opacity: 0.9;
+    stroke: var(--fresh-blood);
+    stroke-width: 1;
+    transition: all 0.3s ease;
+}
+
+.node:hover rect {
+    stroke-width: 2;
+    stroke: var(--fresh-blood);
+    filter: brightness(1.2);
+}
+
+.node text {
+    pointer-events: none;
+    font-size: 12px;
+    font-weight: 500;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+    fill: var(--smoke);
+}
+
+.link {
+    fill: none;
+    stroke-opacity: 0.2;
+    transition: all 0.3s ease;
+}
+
+.link:hover {
+    stroke-opacity: 0.7;
+    filter: brightness(1.2);
+}
+
+.link.highlighted {
+    stroke-opacity: 0.8;
+}
+
+#tooltip {
+    position: absolute;
+    padding: 12px;
+    background-color: rgba(0, 0, 0, 0.9);
+    border: 1px solid var(--fresh-blood);
+    border-radius: 4px;
+    pointer-events: none;
+    font-size: 14px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    max-width: 300px;
+    box-shadow: 0 0 10px rgba(187, 10, 30, 0.3);
+    color: var(--smoke);
+}
+
+.tooltip-title {
+    font-weight: bold;
+    margin-bottom: 5px;
+    border-bottom: 1px solid var(--fresh-blood);
+    padding-bottom: 5px;
+    color: var(--smoke);
+}
+
+.tooltip-content {
+    line-height: 1.4;
+}
+
+.legend-container {
+    margin-top: 40px;
+    background-color: rgba(0, 0, 0, 0.8);
+    border: 1px solid var(--fresh-blood);
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 0 20px rgba(187, 10, 30, 0.3);
+}
+
+.legend-title {
+    text-align: center;
+    margin-bottom: 25px;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--smoke);
+    border-bottom: 2px solid var(--fresh-blood);
+    padding-bottom: 10px;
+    text-shadow: 0 0 5px var(--fresh-blood);
+}
+
+.legend {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 30px;
+    padding: 0 15px;
+}
+
+.legend-section {
+    background-color: rgba(20, 20, 20, 0.8);
+    border-radius: 6px;
+    padding: 15px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    border: 1px solid var(--blood-red);
+}
+
+.legend-section h3 {
+    color: var(--smoke);
+    font-size: 16px;
+    margin-bottom: 15px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--blood-red);
+}
+
+.legend-items {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    padding: 6px 10px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.legend-item:hover {
+    background-color: rgba(187, 10, 30, 0.2);
+    cursor: pointer;
+}
+
+.legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    margin-right: 10px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+#loading {
+    text-align: center;
+    padding: 50px;
+    font-size: 18px;
+}
+
+#error {
+    color: red;
+    text-align: center;
+    padding: 20px;
+    display: none;
+}
+
+.info-icon {
+    cursor: help;
+    display: inline-block;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background-color: #4b70e2;
+    color: white;
+    text-align: center;
+    line-height: 15px;
+    font-size: 11px;
+    margin-left: 5px;
+    font-weight: bold;
+}
+
+.info-tooltip {
+    position: absolute;
+    padding: 10px;
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    border-radius: 4px;
+    font-size: 12px;
+    max-width: 250px;
+    z-index: 100;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+}
+
+.stats-container {
+    display: flex;
+    justify-content: space-around;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+    gap: 15px;
+}
+
+.stat-card {
+    background-color: rgba(20, 20, 20, 0.8);
+    border: 1px solid var(--blood-red);
+    border-radius: 6px;
+    padding: 15px;
+    text-align: center;
+    flex: 1;
+    min-width: 150px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.stat-value {
+    font-size: 24px;
+    font-weight: bold;
+    margin: 10px 0;
+    color: var(--fresh-blood);
+}
+
+.stat-label {
+    font-size: 14px;
+    color: var(--smoke);
+}
+
+#no-data-message {
+    display: none;
+    text-align: center;
+    padding: 40px;
+    font-size: 18px;
+    color: #666;
+}
+
+.search-container {
+    margin: 20px 0;
+    padding: 15px;
+    background-color: rgba(0, 0, 0, 0.6);
+    border: 1px solid var(--fresh-blood);
+    border-radius: 6px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    box-shadow: 0 0 15px rgba(187, 10, 30, 0.2);
+}
+
+#search-input {
+    flex: 1;
+    padding: 12px;
+    border: 1px solid var(--blood-red);
+    border-radius: 4px;
+    background-color: rgba(30, 30, 30, 0.9);
+    font-size: 14px;
+    color: var(--smoke);
+    transition: all 0.3s;
+}
+
+#search-input:focus {
+    border-color: var(--fresh-blood);
+    box-shadow: 0 0 10px var(--fresh-blood);
+    outline: none;
+}
+
+#search-input::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+}
+
+#clear-search {
+    padding: 12px 20px;
+    background-color: var(--dark-red);
+    color: var(--smoke);
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+#clear-search:hover {
+    background-color: var(--fresh-blood);
+    box-shadow: 0 0 15px var(--fresh-blood);
+}
+
+.node.selected rect {
+    stroke: var(--fresh-blood);
+    stroke-width: 3;
+    filter: brightness(1.3);
+    box-shadow: 0 0 15px var(--fresh-blood);
+    animation: pulse 2s infinite;
+}
+
+.node text.label {
+    font-weight: bold;
+    fill: #2c3e50;
+}
+
+.category-label {
+    font-family: 'Cinzel', serif;
+    font-size: 16px;
+    font-weight: bold;
+    fill: var(--smoke);
+    text-shadow: 0 0 5px var(--fresh-blood);
+}
+
+.description-text {
+    margin: 20px 0;
+    padding: 15px;
+    background-color: rgba(20, 20, 20, 0.8);
+    border-radius: 6px;
+    line-height: 1.6;
+    border: 1px solid var(--blood-red);
+    color: var(--smoke);
+}
+
+.insights-container {
+    margin: 20px 0;
+    padding: 20px;
+    background-color: rgba(0, 0, 0, 0.8);
+    border-radius: 8px;
+    box-shadow: 0 0 20px rgba(187, 10, 30, 0.3);
+    border: 1px solid var(--fresh-blood);
+}
+
+.insights-title {
+    font-size: 1.4em;
+    font-weight: bold;
+    margin-bottom: 20px;
+    color: var(--smoke);
+    text-shadow: 0 0 5px var(--fresh-blood);
+    text-align: center;
+    border-bottom: 1px solid var(--fresh-blood);
+    padding-bottom: 10px;
+}
+
+.top-charts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.top-chart {
+    background: rgba(20, 20, 20, 0.8);
+    padding: 15px;
+    border-radius: 6px;
+    border: 1px solid var(--blood-red);
+}
+
+.top-chart h3 {
+    margin: 0 0 15px 0;
+    color: var(--smoke);
+    text-shadow: 0 0 5px var(--fresh-blood);
+    font-size: 1em;
+    text-align: center;
+    border-bottom: 1px solid var(--blood-red);
+    padding-bottom: 8px;
+}
+
+.top-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    color: var(--smoke);
+}
+
+.top-bar {
+    flex-grow: 1;
+    height: 20px;
+    background: rgba(30, 30, 30, 0.9);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.top-bar-fill {
+    height: 100%;
+    background-color: var(--fresh-blood);
+    transition: width 0.3s ease;
+}
+
+.top-value {
+    min-width: 60px;
+    text-align: right;
+    font-size: 0.9em;
+}
+
+.legend {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    padding: 20px;
+}
+
+.legend-section {
+    background: rgba(20, 20, 20, 0.8);
+    padding: 15px;
+    border-radius: 6px;
+    border: 1px solid var(--blood-red);
+}
+
+.legend-section h3 {
+    margin: 0 0 15px 0;
+    text-align: center;
+    border-bottom: 1px solid var(--blood-red);
+    padding-bottom: 8px;
+}
+
+.legend-items {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    padding: 5px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+    cursor: pointer;
+}
+
+.legend-item:hover {
+    background-color: rgba(187, 10, 30, 0.2);
+}
+
+.legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    margin-right: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Add blood drip animation */
+.blood-drip {
+    position: fixed;
+    top: 0;
+    width: 2px;
+    height: 0;
+    background: linear-gradient(var(--fresh-blood), var(--blood-red));
+    animation: drip 3s infinite;
+    opacity: 0.7;
+    z-index: 999;
+}
+
+@keyframes drip {
+    0% { height: 0; top: 0; }
+    70% { height: 100px; top: 0; }
+    100% { height: 0; top: 100px; }
+}
+
+/* Add these at the start of your 2.html file, right after the body tag */
+.blood-drip:nth-child(1) { left: 10%; animation-delay: 0s; }
+.blood-drip:nth-child(2) { left: 30%; animation-delay: 1s; }
+.blood-drip:nth-child(3) { left: 50%; animation-delay: 2s; }
+.blood-drip:nth-child(4) { left: 70%; animation-delay: 1.5s; }
+.blood-drip:nth-child(5) { left: 90%; animation-delay: 0.5s; }
+
+/* Style the select dropdowns better */
+select {
+    background-color: rgba(30, 30, 30, 0.9);
+    color: var(--smoke);
+    border: 1px solid var(--blood-red);
+    padding: 10px;
+}
+
+select option {
+    background-color: rgba(30, 30, 30, 0.9);
+    color: var(--smoke);
+    padding: 10px;
+}
+
+select option:hover {
+    background-color: rgba(187, 10, 30, 0.2);
+    color: var(--smoke);
+}
+
+/* Style scrollbars for dropdowns */
+select::-webkit-scrollbar {
+    width: 10px;
+    background-color: rgba(30, 30, 30, 0.9);
+}
+
+select::-webkit-scrollbar-thumb {
+    background-color: var(--blood-red);
+    border-radius: 5px;
+}
+
+select::-webkit-scrollbar-thumb:hover {
+    background-color: var(--fresh-blood);
+}
+
+/* Add pulsing effect for selected nodes */
+@keyframes pulse {
+    0% { stroke-width: 2; }
+    50% { stroke-width: 4; }
+    100% { stroke-width: 2; }
+}
+
+/* Update insights styling */
+.insights-container {
+    margin: 20px 0;
+    padding: 20px;
+    background-color: rgba(0, 0, 0, 0.8);
+    border-radius: 8px;
+    box-shadow: 0 0 20px rgba(187, 10, 30, 0.3);
+    border: 1px solid var(--fresh-blood);
+}
+
+.insights-title {
+    font-size: 1.4em;
+    font-weight: bold;
+    margin-bottom: 20px;
+    color: var(--smoke);
+    text-shadow: 0 0 5px var(--fresh-blood);
+    text-align: center;
+    border-bottom: 1px solid var(--fresh-blood);
+    padding-bottom: 10px;
+}
+
+.insights-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.insight-card {
+    background: rgba(20, 20, 20, 0.8);
+    padding: 20px;
+    border-radius: 6px;
+    border: 1px solid var(--blood-red);
+    transition: transform 0.3s ease;
+}
+
+.insight-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 15px rgba(187, 10, 30, 0.2);
+}
+
+.insight-card h4 {
+    color: var(--smoke);
+    margin: 0 0 15px 0;
+    font-size: 1.1em;
+    text-shadow: 0 0 5px var(--fresh-blood);
+    text-align: center;
+    border-bottom: 1px solid var(--blood-red);
+    padding-bottom: 8px;
+}
+
+.insight-card p {
+    color: var(--smoke);
+    margin: 8px 0;
+    font-size: 0.9em;
+    line-height: 1.4;
+}
+
+.insight-card strong {
+    color: var(--fresh-blood);
+    font-weight: 600;
+}
